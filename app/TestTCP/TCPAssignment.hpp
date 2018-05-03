@@ -36,6 +36,7 @@ private:
 	{
 		sockaddr src_addr;
 		sockaddr dst_addr;
+		enum Connection_State connection_state;
 		enum TCP_State tcp_state;
 		uint32_t seq_num;
 		uint32_t ack_num;

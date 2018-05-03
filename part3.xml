@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites tests="12" failures="0" disabled="0" errors="0" timestamp="2018-05-03T22:23:13" time="0.84" name="AllTests">
+  <testsuite name="TestEnv_Any" tests="12" failures="0" disabled="0" errors="0" time="0.84">
+    <testcase name="TestTransfer_Connect_Send_Symmetric" status="run" time="0.047" classname="TestEnv_Any" />
+    <testcase name="TestTransfer_Connect_Send_EOF" status="run" time="0.037" classname="TestEnv_Any" />
+    <testcase name="TestTransfer_Connect_Recv_Symmetric" status="run" time="0.039" classname="TestEnv_Any" />
+    <testcase name="TestTransfer_Connect_Recv_EOF" status="run" time="0.04" classname="TestEnv_Any" />
+    <testcase name="TestTransfer_Connect_Recv_SmallBuffer1" status="run" time="0.054" classname="TestEnv_Any" />
+    <testcase name="TestTransfer_Connect_Recv_SmallBuffer2" status="run" time="0.198" classname="TestEnv_Any" />
+    <testcase name="TestTransfer_Accept_Send_Symmetric" status="run" time="0.047" classname="TestEnv_Any" />
+    <testcase name="TestTransfer_Accept_Send_EOF" status="run" time="0.044" classname="TestEnv_Any" />
+    <testcase name="TestTransfer_Accept_Recv_Symmetric" status="run" time="0.039" classname="TestEnv_Any" />
+    <testcase name="TestTransfer_Accept_Recv_EOF" status="run" time="0.037" classname="TestEnv_Any" />
+    <testcase name="TestTransfer_Accept_Recv_SmallBuffer1" status="run" time="0.053" classname="TestEnv_Any" />
+    <testcase name="TestTransfer_Accept_Recv_SmallBuffer2" status="run" time="0.204" classname="TestEnv_Any" />
+  </testsuite>
+</testsuites>

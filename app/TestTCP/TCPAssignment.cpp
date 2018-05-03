@@ -207,7 +207,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 				for(auto connection_iter = rcv_socket->connections.begin(); connection_iter != rcv_socket->connections.end(); ++connection_iter)
 				{
 					struct connection *connection_temp = &*connection_iter;
-					if(connection_temp->tcp_state == TCP_SYN_RCVD)
+					if(connection_temp->connection_state == UNCONNECTED)
 						connection_count++;
 				}
 
@@ -217,6 +217,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 				struct connection connection;
 				connection.src_addr = *(sockaddr *)&dst_addr;
 				connection.dst_addr = *(sockaddr *)&src_addr;
+				connection.connection_state = UNCONNECTED;
 				connection.tcp_state = TCP_SYN_RCVD;
 				connection.seq_num = initial_seq_num++;
 				connection.ack_num = seq_num + 1;
@@ -267,6 +268,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 				{
 					if(connection->tcp_state == TCP_SYN_RCVD)
 					{
+						connection->connection_state = CONNECTED;
 						connection->tcp_state = TCP_ESTABLISHED;
 
 						if(rcv_socket->accept_called)
@@ -292,7 +294,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 							s_socket.src_addr = connection->src_addr;
 							s_socket.dst_addr = connection->dst_addr;
 							s_socket.bound_state = BOUND;
-							s_socket.connection_state = CONNECTED;
+							s_socket.connection_state = connection->connection_state;
 							s_socket.tcp_state = connection->tcp_state;
 							s_socket.backlog = 0;
 							s_socket.seq_num = connection->seq_num;
@@ -1137,7 +1139,7 @@ void TCPAssignment::syscall_accept(UUID syscallUUID, int pid, int sockfd,
 	for(; connection_iter != l_socket->connections.end(); ++connection_iter)
 	{
 		connection = &*connection_iter;
-		if(connection->tcp_state == TCP_ESTABLISHED || connection->tcp_state == TCP_CLOSE_WAIT)
+		if(connection->connection_state == CONNECTED)
 		{
 			found = true;
 			break;
@@ -1167,7 +1169,7 @@ void TCPAssignment::syscall_accept(UUID syscallUUID, int pid, int sockfd,
 		s_socket.src_addr = connection->src_addr;
 		s_socket.dst_addr = connection->dst_addr;
 		s_socket.bound_state = BOUND;
-		s_socket.connection_state = CONNECTED;
+		s_socket.connection_state = connection->connection_state;
 		s_socket.tcp_state = connection->tcp_state;
 		s_socket.backlog = 0;
 		s_socket.seq_num = connection->seq_num;

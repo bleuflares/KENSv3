@@ -246,6 +246,9 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 				reply_pkt->writeData(14 + 20 + 16, &packet_checksum, 2);
 
 				this->sendPacket("IPv4", reply_pkt);
+
+				struct connection *connection_temp = &*(--rcv_socket->connections.end());
+				connection_temp->seq_num += 1;
 			}
 			else if(flags == ACK)
 			{
@@ -264,7 +267,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 				if(!found)
 					break;
 
-				if(connection->seq_num + 1 == ack_num)
+				if(connection->seq_num == ack_num)
 				{
 					if(connection->tcp_state == TCP_SYN_RCVD)
 					{
@@ -317,7 +320,6 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 					}
 					else if(connection->tcp_state == TCP_LAST_ACK)
 					{
-						connection->seq_num = ack_num;
 						rcv_socket->connections.erase(connection_iter);
 						if(rcv_socket->connections.empty())
 						{
@@ -367,7 +369,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 				{
 					connection->ack_num = seq_num + 1;
 
-					packet_seq_num = htonl(connection->seq_num + 1);
+					packet_seq_num = htonl(connection->seq_num);
 					packet_ack_num = htonl(connection->ack_num);
 					packet_flags = (uint8_t) ACK;
 					packet_checksum = (uint16_t) 0x0000;
@@ -397,7 +399,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 				{
 					connection->ack_num = seq_num + 1;
 
-					packet_seq_num = htonl(connection->seq_num + 1);
+					packet_seq_num = htonl(connection->seq_num);
 					packet_ack_num = htonl(connection->ack_num);
 					packet_flags = (uint8_t) ACK;
 					packet_checksum = (uint16_t) 0x0000;
@@ -427,7 +429,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 				{
 					connection->ack_num = seq_num + 1;
 
-					packet_seq_num = htonl(connection->seq_num + 1);
+					packet_seq_num = htonl(connection->seq_num);
 					packet_ack_num = htonl(connection->ack_num);
 					packet_flags = (uint8_t) ACK;
 					packet_checksum = (uint16_t) 0x0000;
@@ -466,11 +468,11 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 		case TCP_SYN_SENT:
 			if(flags == SYNACK)
 			{
-				if(rcv_socket->seq_num + 1 == ack_num)
+				if(rcv_socket->seq_num == ack_num)
 				{
 					rcv_socket->ack_num = seq_num + 1;
 
-					packet_seq_num = htonl(rcv_socket->seq_num + 1);
+					packet_seq_num = htonl(rcv_socket->seq_num);
 					packet_ack_num = htonl(rcv_socket->ack_num);
 					packet_flags = (uint8_t) ACK;
 					packet_checksum = (uint16_t) 0x0000;
@@ -507,7 +509,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 			{
 				rcv_socket->ack_num = seq_num + 1;
 
-				packet_seq_num = htonl(rcv_socket->seq_num + 1);
+				packet_seq_num = htonl(rcv_socket->seq_num);
 				packet_ack_num = htonl(rcv_socket->ack_num);
 				packet_flags = (uint8_t) ACK;
 				packet_checksum = (uint16_t) 0x0000;
@@ -551,14 +553,14 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 		case TCP_FIN_WAIT_1:
 			if(flags == ACK)
 			{
-				if(rcv_socket->seq_num + 1 == ack_num)
+				if(rcv_socket->seq_num == ack_num)
 					rcv_socket->tcp_state = TCP_FIN_WAIT_2;
 			}
 			else if(flags == FIN)
 			{
 				rcv_socket->ack_num = seq_num + 1;
 
-				packet_seq_num = htonl(rcv_socket->seq_num + 1);
+				packet_seq_num = htonl(rcv_socket->seq_num);
 				packet_ack_num = htonl(rcv_socket->ack_num);
 				packet_flags = (uint8_t) ACK;
 				packet_checksum = (uint16_t) 0x0000;
@@ -591,7 +593,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 			{
 				rcv_socket->ack_num = seq_num + 1;
 
-				packet_seq_num = htonl(rcv_socket->seq_num + 1);
+				packet_seq_num = htonl(rcv_socket->seq_num);
 				packet_ack_num = htonl(rcv_socket->ack_num);
 				packet_flags = (uint8_t) ACK;
 				packet_checksum = (uint16_t) 0x0000;
@@ -628,7 +630,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 		case TCP_CLOSING:
 			if(flags == ACK)
 			{
-				if(rcv_socket->seq_num + 1 == ack_num)
+				if(rcv_socket->seq_num == ack_num)
 				{
 					rcv_socket->tcp_state = TCP_TIME_WAIT;
 
@@ -803,8 +805,6 @@ void TCPAssignment::syscall_close(UUID syscallUUID, int pid, int fd)
 
 					if(connection->tcp_state == TCP_SYN_RCVD || connection->tcp_state == TCP_ESTABLISHED)
 					{
-						connection->seq_num += 1;
-
 						packet_seq_num = htonl(connection->seq_num);
 						packet_ack_num = htonl(0x00000000);
 						packet_headerlen = (uint8_t) 0x50;
@@ -835,12 +835,11 @@ void TCPAssignment::syscall_close(UUID syscallUUID, int pid, int fd)
 
 						this->sendPacket("IPv4", fin_pkt);
 
+						connection->seq_num += 1;
 						connection->tcp_state = TCP_FIN_WAIT_1;
 					}
 					else if(connection->tcp_state == TCP_CLOSE_WAIT)
 					{
-						connection->seq_num += 1;
-
 						packet_seq_num = htonl(connection->seq_num);
 						packet_ack_num = htonl(0x00000000);
 						packet_headerlen = (uint8_t) 0x50;
@@ -871,6 +870,7 @@ void TCPAssignment::syscall_close(UUID syscallUUID, int pid, int fd)
 
 						this->sendPacket("IPv4", fin_pkt);
 
+						connection->seq_num += 1;
 						connection->tcp_state = TCP_LAST_ACK;
 					}
 					else
@@ -890,8 +890,6 @@ void TCPAssignment::syscall_close(UUID syscallUUID, int pid, int fd)
 			break;
 
 		case TCP_ESTABLISHED:
-			socket->seq_num += 1;
-
 			packet_seq_num = htonl(socket->seq_num);
 			packet_ack_num = htonl(0x00000000);
 			packet_headerlen = (uint8_t) 0x50;
@@ -922,12 +920,11 @@ void TCPAssignment::syscall_close(UUID syscallUUID, int pid, int fd)
 
 			this->sendPacket("IPv4", fin_pkt);
 
+			socket->seq_num += 1;
 			socket->tcp_state = TCP_FIN_WAIT_1;
 			break;
 
 		case TCP_CLOSE_WAIT:
-			socket->seq_num += 1;
-
 			packet_seq_num = htonl(socket->seq_num);
 			packet_ack_num = htonl(0x00000000);
 			packet_headerlen = (uint8_t) 0x50;
@@ -958,6 +955,7 @@ void TCPAssignment::syscall_close(UUID syscallUUID, int pid, int fd)
 
 			this->sendPacket("IPv4", fin_pkt);
 
+			socket->seq_num += 1;
 			socket->tcp_state = TCP_LAST_ACK;
 			break;
 
@@ -1051,7 +1049,6 @@ void TCPAssignment::syscall_connect(UUID syscallUUID, int pid, int sockfd,
 	}
 
 	c_socket->dst_addr = *addr;
-	c_socket->seq_num += 1;
 
 	uint32_t packet_seq_num = htonl(c_socket->seq_num);
 	uint32_t packet_ack_num = htonl(0x00000000);
@@ -1084,6 +1081,8 @@ void TCPAssignment::syscall_connect(UUID syscallUUID, int pid, int sockfd,
 	syn_pkt->writeData(14 + 20 + 16, &packet_checksum, 2);
 
 	this->sendPacket("IPv4", syn_pkt);
+
+	c_socket->seq_num += 1;
 	c_socket->tcp_state = TCP_SYN_SENT;
 
 	c_socket->uuid = syscallUUID;

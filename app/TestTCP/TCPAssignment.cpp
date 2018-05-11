@@ -58,10 +58,10 @@ void TCPAssignment::systemCallback(UUID syscallUUID, int pid, const SystemCallPa
 		this->syscall_close(syscallUUID, pid, param.param1_int);
 		break;
 	case READ:
-		//this->syscall_read(syscallUUID, pid, param.param1_int, param.param2_ptr, param.param3_int);
+		this->syscall_read(syscallUUID, pid, param.param1_int, param.param2_ptr, param.param3_int);
 		break;
 	case WRITE:
-		//this->syscall_write(syscallUUID, pid, param.param1_int, param.param2_ptr, param.param3_int);
+		this->syscall_write(syscallUUID, pid, param.param1_int, param.param2_ptr, param.param3_int);
 		break;
 	case CONNECT:
 		this->syscall_connect(syscallUUID, pid, param.param1_int,
@@ -207,7 +207,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 				for(auto connection_iter = rcv_socket->connections.begin(); connection_iter != rcv_socket->connections.end(); ++connection_iter)
 				{
 					struct connection *connection_temp = &*connection_iter;
-					if(connection_temp->connection_state == UNCONNECTED)
+					if(connection_temp->tcp_state == TCP_SYN_RCVD)
 						connection_count++;
 				}
 
@@ -217,7 +217,6 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 				struct connection connection;
 				connection.src_addr = *(sockaddr *)&dst_addr;
 				connection.dst_addr = *(sockaddr *)&src_addr;
-				connection.connection_state = UNCONNECTED;
 				connection.tcp_state = TCP_SYN_RCVD;
 				connection.seq_num = initial_seq_num++;
 				connection.ack_num = seq_num + 1;
@@ -246,9 +245,6 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 				reply_pkt->writeData(14 + 20 + 16, &packet_checksum, 2);
 
 				this->sendPacket("IPv4", reply_pkt);
-
-				struct connection *connection_temp = &*(--rcv_socket->connections.end());
-				connection_temp->seq_num += 1;
 			}
 			else if(flags == ACK)
 			{
@@ -271,7 +267,6 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 				{
 					if(connection->tcp_state == TCP_SYN_RCVD)
 					{
-						connection->connection_state = CONNECTED;
 						connection->tcp_state = TCP_ESTABLISHED;
 
 						if(rcv_socket->accept_called)
@@ -292,12 +287,15 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 							}
 
 							struct sock_info s_socket;
+							static struct read_buffer empty_rb;
+							static struct write_buffer empty_wb;
 							s_socket.uuid = 0;
 							s_socket.pid = rcv_socket->pid;
 							s_socket.src_addr = connection->src_addr;
 							s_socket.dst_addr = connection->dst_addr;
 							s_socket.bound_state = BOUND;
-							s_socket.connection_state = connection->connection_state;
+							s_socket.connection_state = CONNECTED;
+							s_socket.close_state = UNCLOSED;
 							s_socket.tcp_state = connection->tcp_state;
 							s_socket.backlog = 0;
 							s_socket.seq_num = connection->seq_num;
@@ -305,6 +303,14 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 							s_socket.accept_called = false;
 							s_socket.accept_addr = NULL;
 							s_socket.accept_addrlen = NULL;
+							s_socket.rb = empty_rb;
+							s_socket.read_called = false;
+							s_socket.read_buf = NULL;
+							s_socket.read_count = 0;
+							s_socket.wb = empty_wb;
+							s_socket.write_called = false;
+							s_socket.write_buf = NULL;
+							s_socket.write_count = 0;
 
 							rcv_socket->connections.erase(connection_iter);
 							fd_to_socket.insert(std::pair<std::array<int, 2>, sock_info>(fd_to_pid, s_socket));
@@ -369,7 +375,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 				{
 					connection->ack_num = seq_num + 1;
 
-					packet_seq_num = htonl(connection->seq_num);
+					packet_seq_num = htonl(connection->seq_num + 1);
 					packet_ack_num = htonl(connection->ack_num);
 					packet_flags = (uint8_t) ACK;
 					packet_checksum = (uint16_t) 0x0000;
@@ -743,12 +749,15 @@ void TCPAssignment::syscall_socket(UUID syscallUUID, int pid, int domain, int ty
 	
 	struct sock_info socket;
 	static struct sockaddr empty_addr;
+	static struct read_buffer empty_rb;
+	static struct write_buffer empty_wb;
 	socket.uuid = 0;
 	socket.pid = pid;
 	socket.src_addr = empty_addr;
 	socket.dst_addr = empty_addr;
 	socket.bound_state = UNBOUND;
 	socket.connection_state = UNCONNECTED;
+	socket.close_state = UNCLOSED;
 	socket.tcp_state = TCP_CLOSED;
 	socket.backlog = 0;
 	socket.seq_num = initial_seq_num++;
@@ -756,6 +765,14 @@ void TCPAssignment::syscall_socket(UUID syscallUUID, int pid, int domain, int ty
 	socket.accept_called = false;
 	socket.accept_addr = NULL;
 	socket.accept_addrlen = NULL;
+	socket.rb = empty_rb;
+	socket.read_called = false;
+	socket.read_buf = NULL;
+	socket.read_count = 0;
+	socket.wb = empty_wb;
+	socket.write_called = false;
+	socket.write_buf = NULL;
+	socket.write_count = 0;
 
 	fd_to_socket.insert(std::pair<std::array<int, 2>, sock_info>(fd_to_pid, socket));
 
@@ -773,7 +790,9 @@ void TCPAssignment::syscall_close(UUID syscallUUID, int pid, int fd)
 		return;
 	}
 	struct sock_info *socket = &socket_iter->second;
-	
+
+	socket->close_state = CLOSED;
+
 	Packet *fin_pkt;
 	uint32_t packet_seq_num;
 	uint32_t packet_ack_num;
@@ -809,7 +828,7 @@ void TCPAssignment::syscall_close(UUID syscallUUID, int pid, int fd)
 						packet_ack_num = htonl(0x00000000);
 						packet_headerlen = (uint8_t) 0x50;
 						packet_flags = (uint8_t) FIN;
-						packet_rwnd = (uint16_t) htons(51200);
+						packet_rwnd = (uint16_t) htons(BUF_SIZE);
 						packet_checksum = (uint16_t) 0x0000;
 						packet_pointer = (uint16_t) 0x0000;
 
@@ -834,7 +853,6 @@ void TCPAssignment::syscall_close(UUID syscallUUID, int pid, int fd)
 						fin_pkt->writeData(14 + 20 + 16, &packet_checksum, 2);
 
 						this->sendPacket("IPv4", fin_pkt);
-
 						connection->seq_num += 1;
 						connection->tcp_state = TCP_FIN_WAIT_1;
 					}
@@ -844,7 +862,7 @@ void TCPAssignment::syscall_close(UUID syscallUUID, int pid, int fd)
 						packet_ack_num = htonl(0x00000000);
 						packet_headerlen = (uint8_t) 0x50;
 						packet_flags = (uint8_t) FIN;
-						packet_rwnd = (uint16_t) htons(51200);
+						packet_rwnd = (uint16_t) htons(BUF_SIZE);
 						packet_checksum = (uint16_t) 0x0000;
 						packet_pointer = (uint16_t) 0x0000;
 
@@ -894,7 +912,7 @@ void TCPAssignment::syscall_close(UUID syscallUUID, int pid, int fd)
 			packet_ack_num = htonl(0x00000000);
 			packet_headerlen = (uint8_t) 0x50;
 			packet_flags = (uint8_t) FIN;
-			packet_rwnd = (uint16_t) htons(51200);
+			packet_rwnd = (uint16_t) htons(BUF_SIZE);
 			packet_checksum = (uint16_t) 0x0000;
 			packet_pointer = (uint16_t) 0x0000;
 
@@ -920,7 +938,6 @@ void TCPAssignment::syscall_close(UUID syscallUUID, int pid, int fd)
 
 			this->sendPacket("IPv4", fin_pkt);
 
-			socket->seq_num += 1;
 			socket->tcp_state = TCP_FIN_WAIT_1;
 			break;
 
@@ -929,7 +946,7 @@ void TCPAssignment::syscall_close(UUID syscallUUID, int pid, int fd)
 			packet_ack_num = htonl(0x00000000);
 			packet_headerlen = (uint8_t) 0x50;
 			packet_flags = (uint8_t) FIN;
-			packet_rwnd = (uint16_t) htons(51200);
+			packet_rwnd = (uint16_t) htons(BUF_SIZE);
 			packet_checksum = (uint16_t) 0x0000;
 			packet_pointer = (uint16_t) 0x0000;
 
@@ -968,18 +985,94 @@ void TCPAssignment::syscall_close(UUID syscallUUID, int pid, int fd)
 			break;
 	}
 }
-/*
-void TCPAssignment::syscall_read(syscallUUID, pid, param.param1_int, param.param2_ptr, param.param3_int)
+
+void TCPAssignment::syscall_read(UUID syscallUUID, int pid, int fd, void *buf, size_t count)
 {
+	std::array<int, 2> fd_to_pid = {sockfd, pid};
+	auto socket_iter = fd_to_socket.find(fd_to_pid);
+	if(socket_iter == fd_to_socket.end())
+	{
+		this->returnSystemCall(syscallUUID, -1);
+		return;
+	}
+	struct sock_info *socket = &socket_iter->second;
+	if(socket->pid != pid)
+	{
+		this->returnSystemCall(syscallUUID, -1);
+		return;
+	}
+
+	if(socket->connection_state != CONNECTED || socket->close_state != UNCLOSED)
+	{
+		this->returnSystemCall(syscallUUID, -1);
+		return;
+	}
+
+	if(socket->rb.cont_size > 0)
+	{
+		size_t read_count = rb_read(socket->rb, buf, count);
+
+		this->returnSystemCall(syscallUUID, read_count);
+		return;
+	}
+	else
+	{
+		socket->read_called = true;
+		socket->read_buf = buf;
+		socket->read_count = count;
+
+		socket->uuid = syscallUUID;
+		return;
+	}
+}
+
+void TCPAssignment::syscall_write(UUID syscallUUID, int pid, int fd, const void *buf, size_t count)
+{
+	std::array<int, 2> fd_to_pid = {sockfd, pid};
+	auto socket_iter = fd_to_socket.find(fd_to_pid);
+	if(socket_iter == fd_to_socket.end())
+	{
+		this->returnSystemCall(syscallUUID, -1);
+		return;
+	}
+	struct sock_info *socket = &socket_iter->second;
+	if(socket->pid != pid)
+	{
+		this->returnSystemCall(syscallUUID, -1);
+		return;
+	}
+
+	if(socket->connection_state != CONNECTED || socket->close_state != UNCLOSED)
+	{
+		this->returnSystemCall(syscallUUID, -1);
+		return;
+	}
+
+	if(count <= socket->wb.size)
+	{
+		size_t write_count = wb_write(socket->wb, buf, count);
+
+		while(socket->rwnd > socket->wmgr.size)
+		{
+			struct write_info wi;
+			//send packet
+		}
+
+		this->returnSystemCall(syscallUUID, write_count);
+		return;
+	}
+	else
+	{
+		socket->write_called = true;
+		socket->write_buf = buf;
+		socket->write_count = count;
+
+		socket->uuid = syscallUUID;
+		return;
+	}
 
 }
 
-
-void TCPAssignment::syscall_write(syscallUUID, pid, param.param1_int, param.param2_ptr, param.param3_int)
-{
-
-}
-*/
 void TCPAssignment::syscall_connect(UUID syscallUUID, int pid, int sockfd,
 		struct sockaddr *addr, socklen_t addrlen)
 {
@@ -1054,7 +1147,7 @@ void TCPAssignment::syscall_connect(UUID syscallUUID, int pid, int sockfd,
 	uint32_t packet_ack_num = htonl(0x00000000);
 	uint8_t packet_headerlen = (uint8_t) 0x50;
 	uint8_t packet_flags = (uint8_t) SYN;
-	uint16_t packet_rwnd = (uint16_t) htons(51200);
+	uint16_t packet_rwnd = (uint16_t) htons(BUF_SIZE);
 	uint16_t packet_checksum = (uint16_t) 0x0000;
 	uint16_t packet_pointer = (uint16_t) 0x0000;
 
@@ -1138,7 +1231,7 @@ void TCPAssignment::syscall_accept(UUID syscallUUID, int pid, int sockfd,
 	for(; connection_iter != l_socket->connections.end(); ++connection_iter)
 	{
 		connection = &*connection_iter;
-		if(connection->connection_state == CONNECTED)
+		if(connection->tcp_state == TCP_ESTABLISHED || connection->tcp_state == TCP_CLOSE_WAIT)
 		{
 			found = true;
 			break;
@@ -1163,12 +1256,15 @@ void TCPAssignment::syscall_accept(UUID syscallUUID, int pid, int sockfd,
 		}
 
 		struct sock_info s_socket;
+		static struct read_buffer empty_rb;
+		static struct write_buffer empty_wb;
 		s_socket.uuid = 0;
 		s_socket.pid = pid;
 		s_socket.src_addr = connection->src_addr;
 		s_socket.dst_addr = connection->dst_addr;
 		s_socket.bound_state = BOUND;
-		s_socket.connection_state = connection->connection_state;
+		s_socket.connection_state = CONNECTED;
+		s_socket.close_state = UNCLOSED;
 		s_socket.tcp_state = connection->tcp_state;
 		s_socket.backlog = 0;
 		s_socket.seq_num = connection->seq_num;
@@ -1176,6 +1272,14 @@ void TCPAssignment::syscall_accept(UUID syscallUUID, int pid, int sockfd,
 		s_socket.accept_called = false;
 		s_socket.accept_addr = NULL;
 		s_socket.accept_addrlen = NULL;
+		s_socket.rb = empty_rb;
+		s_socket.read_called = false;
+		s_socket.read_buf = NULL;
+		s_socket.read_count = 0;
+		s_socket.wb = empty_wb;
+		s_socket.write_called = false;
+		s_socket.write_buf = NULL;
+		s_socket.write_count = 0;
 
 		l_socket->connections.erase(connection_iter);
 		fd_to_socket.insert(std::pair<std::array<int, 2>, sock_info>(fd_to_pid, s_socket));
@@ -1306,5 +1410,39 @@ void TCPAssignment::syscall_getpeername(UUID syscallUUID, int pid, int sockfd,
 	return;
 }
 
+size_t rb_read(struct read_buffer rb, void *buf, size_t count)
+{
+	size_t read_count = rb.cont_size >= count ? count : rb.cont_size;
+	if(rb.start + read_count > BUF_SIZE)
+	{
+		memcpy(buf, rb.buffer + rb.start, BUF_SIZE - rb.start);
+		memcpy(buf + (BUF_SIZE - rb.start), rb.buffer, read_count - (BUF_SIZE - rb.start));
+		rb.start = read_count - (BUF_SIZE - rb.start);
+	}
+	else
+	{
+		memcpy(buf, rb.buffer + rb.start, read_count);
+		rb.start += read_count;
+	}
+	rb.size -= read_count;
+	return read_count;
 }
 
+size_t wb_write(struct write_buffer wb, const void *buf, size_t count)
+{
+	if(wb.end + count > BUF_SIZE)
+	{
+		memcpy(wb.buffer + wb.end, buf, BUF_SIZE - wb.end);
+		memcpy(wb.buffer, buf + (BUF_SIZE - wb.end), count - (BUF_SIZE - wb.end));
+		wb.end = count - (BUF_SIZE - wb.end);
+	}
+	else
+	{
+		memcpy(wb.buffer + wb.end, buf, count);
+		wb.end += count;
+	}
+	wb.size += count;
+	return count;
+}
+
+}

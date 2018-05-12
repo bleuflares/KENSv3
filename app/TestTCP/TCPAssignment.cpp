@@ -351,7 +351,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 						connection->tcp_state = TCP_TIME_WAIT;
 
 						struct timer_payload *timer = new struct timer_payload;
-						timer->type = CONNECTION;
+						timer->type = PAYLOAD_CONNECTION;
 						timer->socket = rcv_socket;
 						timer->connection = connection;
 
@@ -466,7 +466,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 					connection->tcp_state = TCP_TIME_WAIT;
 						
 					struct timer_payload *timer = new struct timer_payload;
-					timer->type = CONNECTION;
+					timer->type = PAYLOAD_CONNECTION;
 					timer->socket = rcv_socket;
 					timer->connection = connection;
 
@@ -697,7 +697,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 							}
 
 							struct timer_payload *timer = new struct timer_payload;
-							timer->type = PACKET;
+							timer->type = PAYLOAD_PACKET;
 							timer->socket = rcv_socket;
 							rcv_socket->retransmit_timer = timer;
 
@@ -796,7 +796,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 								if(rcv_socket->wmgr.write_infos.empty())
 								{
 									struct timer_payload *timer = new struct timer_payload;
-									timer->type = PACKET;
+									timer->type = PAYLOAD_PACKET;
 									timer->socket = rcv_socket;
 									rcv_socket->retransmit_timer = timer;
 
@@ -897,7 +897,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 				rcv_socket->tcp_state = TCP_TIME_WAIT;
 
 				struct timer_payload *timer = new struct timer_payload;
-				timer->type = SOCKET;
+				timer->type = PAYLOAD_SOCKET;
 				timer->socket = rcv_socket;
 
 				timer->uuid = addTimer(timer, TimeUtil::makeTime(60, TimeUtil::SEC));
@@ -912,7 +912,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 					rcv_socket->tcp_state = TCP_TIME_WAIT;
 
 					struct timer_payload *timer = new struct timer_payload;
-					timer->type = SOCKET;
+					timer->type = PAYLOAD_SOCKET;
 					timer->socket = rcv_socket;
 
 					timer->uuid = addTimer(timer, TimeUtil::makeTime(60, TimeUtil::SEC));
@@ -933,7 +933,7 @@ void TCPAssignment::timerCallback(void *payload)
 
 	cancelTimer(timer->uuid);
 
-	if(timer->type == SOCKET)
+	if(timer->type == PAYLOAD_SOCKET)
 	{
 		struct sock_info *socket = timer->socket;
 		int fd;
@@ -958,7 +958,7 @@ void TCPAssignment::timerCallback(void *payload)
 
 		this->returnSystemCall(socket->uuid, 0);
 	}
-	else if(timer->type == CONNECTION)
+	else if(timer->type == PAYLOAD_CONNECTION)
 	{
 		struct sock_info *socket = timer->socket;
 		struct connection *connection = timer->connection;
@@ -1003,7 +1003,7 @@ void TCPAssignment::timerCallback(void *payload)
 			this->returnSystemCall(socket->uuid, 0);
 		}
 	}
-	else if(timer->type == PACKET)
+	else if(timer->type == PAYLOAD_PACKET)
 	{
 		struct sock_info *socket = timer->socket;
 		socket->dup_ack_count = 0;
@@ -1053,7 +1053,7 @@ void TCPAssignment::timerCallback(void *payload)
 		}
 
 		struct timer_payload *retransmit_timer = new struct timer_payload;
-		timer->type = PACKET;
+		timer->type = PAYLOAD_PACKET;
 		timer->socket = socket;
 		socket->retransmit_timer = retransmit_timer;
 
@@ -1438,7 +1438,7 @@ void TCPAssignment::syscall_write(UUID syscallUUID, int pid, int fd, const void 
 				if(socket->wmgr.write_infos.empty())
 				{
 					struct timer_payload *timer = new struct timer_payload;
-					timer->type = PACKET;
+					timer->type = PAYLOAD_PACKET;
 					timer->socket = socket;
 					socket->retransmit_timer = timer;
 
@@ -1803,25 +1803,25 @@ void TCPAssignment::syscall_getpeername(UUID syscallUUID, int pid, int sockfd,
 	return;
 }
 
-size_t rb_read(struct read_buffer rb, void *buf, size_t count)
+size_t TCPAssignment::rb_read(struct read_buffer rb, void *buf, size_t count)
 {
 	size_t read_count = rb.cont_size >= count ? count : rb.cont_size;
 	if(rb.start + read_count > BUF_SIZE)
 	{
 		memcpy(buf, rb.buffer + rb.start, BUF_SIZE - rb.start);
-		memcpy(buf + (BUF_SIZE - rb.start), rb.buffer, read_count - (BUF_SIZE - rb.start));
+		memcpy((uint8_t *)buf + (BUF_SIZE - rb.start), rb.buffer, read_count - (BUF_SIZE - rb.start));
 	}
 	else
 		memcpy(buf, rb.buffer + rb.start, read_count);
 	return read_count;
 }
 
-size_t rb_write(struct read_buffer rb, const void *buf, size_t count)
+size_t TCPAssignment::rb_write(struct read_buffer rb, const void *buf, size_t count)
 {
 	if(rb.end + count > BUF_SIZE)
 	{
 		memcpy(rb.buffer + rb.end, buf, BUF_SIZE - rb.end);
-		memcpy(rb.buffer, buf + (BUF_SIZE - rb.end), count - (BUF_SIZE - rb.end));
+		memcpy(rb.buffer, (uint8_t *)buf + (BUF_SIZE - rb.end), count - (BUF_SIZE - rb.end));
 		rb.end = count - (BUF_SIZE - rb.end);
 	}
 	else
@@ -1833,12 +1833,12 @@ size_t rb_write(struct read_buffer rb, const void *buf, size_t count)
 	return count;
 }
 
-size_t rb_pos_write(struct read_buffer rb, size_t pos, const void *buf, size_t count)
+size_t TCPAssignment::rb_pos_write(struct read_buffer rb, size_t pos, const void *buf, size_t count)
 {
 	if(rb.cont_end + pos + count > BUF_SIZE)
 	{
 		memcpy(rb.buffer + rb.cont_end + pos, buf, BUF_SIZE - (rb.cont_end + pos));
-		memcpy(rb.buffer, buf + (BUF_SIZE - (rb.cont_end + pos)), count - (BUF_SIZE - (rb.cont_end + pos)));
+		memcpy(rb.buffer, (uint8_t *)buf + (BUF_SIZE - (rb.cont_end + pos)), count - (BUF_SIZE - (rb.cont_end + pos)));
 		rb.end = rb.end >= count - (BUF_SIZE - (rb.cont_end + pos)) ? rb.end : count - (BUF_SIZE - (rb.cont_end + pos));
 		rb.size = rb.end + BUF_SIZE - rb.start;
 	}
@@ -1851,13 +1851,13 @@ size_t rb_pos_write(struct read_buffer rb, size_t pos, const void *buf, size_t c
 	return count;
 }
 
-size_t wb_read(struct write_buffer wb, void *buf, size_t count)
+size_t TCPAssignment::wb_read(struct write_buffer wb, void *buf, size_t count)
 {
 	size_t read_count = wb.size >= count ? count : wb.size;
 	if(wb.start + read_count > BUF_SIZE)
 	{
 		memcpy(buf, wb.buffer + wb.start, BUF_SIZE - wb.start);
-		memcpy(buf + (BUF_SIZE - wb.start), wb.buffer, read_count - (BUF_SIZE - wb.start));
+		memcpy((uint8_t *)buf + (BUF_SIZE - wb.start), wb.buffer, read_count - (BUF_SIZE - wb.start));
 	}
 	else
 		memcpy(buf, wb.buffer + wb.start, read_count);
@@ -1865,12 +1865,12 @@ size_t wb_read(struct write_buffer wb, void *buf, size_t count)
 }
 
 
-size_t wb_write(struct write_buffer wb, const void *buf, size_t count)
+size_t TCPAssignment::wb_write(struct write_buffer wb, const void *buf, size_t count)
 {
 	if(wb.end + count > BUF_SIZE)
 	{
 		memcpy(wb.buffer + wb.end, buf, BUF_SIZE - wb.end);
-		memcpy(wb.buffer, buf + (BUF_SIZE - wb.end), count - (BUF_SIZE - wb.end));
+		memcpy(wb.buffer, (uint8_t *)buf + (BUF_SIZE - wb.end), count - (BUF_SIZE - wb.end));
 		wb.end = count - (BUF_SIZE - wb.end);
 	}
 	else

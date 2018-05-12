@@ -1,21 +1,219 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites tests="15" failures="0" disabled="0" errors="0" timestamp="2018-05-11T22:40:22" time="0.084" name="AllTests">
-  <testsuite name="TestEnv_Reliable" tests="2" failures="0" disabled="0" errors="0" time="0.062">
-    <testcase name="TestAccept_Backlog1" status="run" time="0.057" classname="TestEnv_Reliable" />
-    <testcase name="TestAccept_Backlog2" status="run" time="0.005" classname="TestEnv_Reliable" />
+<testsuites tests="15" failures="9" disabled="0" errors="0" timestamp="2018-05-13T05:23:56" time="1.505" name="AllTests">
+  <testsuite name="TestEnv_Reliable" tests="2" failures="2" disabled="0" errors="0" time="0.193">
+    <testcase name="TestAccept_Backlog1" status="run" time="0.087" classname="TestEnv_Reliable">
+      <failure message="testhandshake.cpp:90&#x0A;Expected equality of these values:&#x0A;  (int)client_sockets.size()&#x0A;    Which is: 0&#x0A;  expected_accept&#x0A;    Which is: 3" type=""><![CDATA[testhandshake.cpp:90
+Expected equality of these values:
+  (int)client_sockets.size()
+    Which is: 0
+  expected_accept
+    Which is: 3]]></failure>
+    </testcase>
+    <testcase name="TestAccept_Backlog2" status="run" time="0.106" classname="TestEnv_Reliable">
+      <failure message="testhandshake.cpp:90&#x0A;Expected equality of these values:&#x0A;  (int)client_sockets.size()&#x0A;    Which is: 0&#x0A;  expected_accept&#x0A;    Which is: 6" type=""><![CDATA[testhandshake.cpp:90
+Expected equality of these values:
+  (int)client_sockets.size()
+    Which is: 0
+  expected_accept
+    Which is: 6]]></failure>
+      <failure message="testhandshake.cpp:168&#x0A;Expected equality of these values:&#x0A;  (int)client_sockets.size()&#x0A;    Which is: 0&#x0A;  expected_connect&#x0A;    Which is: 1" type=""><![CDATA[testhandshake.cpp:168
+Expected equality of these values:
+  (int)client_sockets.size()
+    Which is: 0
+  expected_connect
+    Which is: 1]]></failure>
+      <failure message="testhandshake.cpp:168&#x0A;Expected equality of these values:&#x0A;  (int)client_sockets.size()&#x0A;    Which is: 0&#x0A;  expected_connect&#x0A;    Which is: 1" type=""><![CDATA[testhandshake.cpp:168
+Expected equality of these values:
+  (int)client_sockets.size()
+    Which is: 0
+  expected_connect
+    Which is: 1]]></failure>
+      <failure message="testhandshake.cpp:168&#x0A;Expected equality of these values:&#x0A;  (int)client_sockets.size()&#x0A;    Which is: 0&#x0A;  expected_connect&#x0A;    Which is: 1" type=""><![CDATA[testhandshake.cpp:168
+Expected equality of these values:
+  (int)client_sockets.size()
+    Which is: 0
+  expected_connect
+    Which is: 1]]></failure>
+      <failure message="testhandshake.cpp:168&#x0A;Expected equality of these values:&#x0A;  (int)client_sockets.size()&#x0A;    Which is: 0&#x0A;  expected_connect&#x0A;    Which is: 1" type=""><![CDATA[testhandshake.cpp:168
+Expected equality of these values:
+  (int)client_sockets.size()
+    Which is: 0
+  expected_connect
+    Which is: 1]]></failure>
+      <failure message="testhandshake.cpp:168&#x0A;Expected equality of these values:&#x0A;  (int)client_sockets.size()&#x0A;    Which is: 0&#x0A;  expected_connect&#x0A;    Which is: 1" type=""><![CDATA[testhandshake.cpp:168
+Expected equality of these values:
+  (int)client_sockets.size()
+    Which is: 0
+  expected_connect
+    Which is: 1]]></failure>
+    </testcase>
   </testsuite>
-  <testsuite name="TestEnv_Any" tests="13" failures="0" disabled="0" errors="0" time="0.021">
-    <testcase name="TestClose_Connect_CloseFirst" status="run" time="0.003" classname="TestEnv_Any" />
-    <testcase name="TestClose_Connect_CloseLater" status="run" time="0.002" classname="TestEnv_Any" />
+  <testsuite name="TestEnv_Any" tests="13" failures="7" disabled="0" errors="0" time="1.312">
+    <testcase name="TestClose_Connect_CloseFirst" status="run" time="0.002" classname="TestEnv_Any" />
+    <testcase name="TestClose_Connect_CloseLater" status="run" time="0.003" classname="TestEnv_Any" />
     <testcase name="TestClose_Connect_CloseSimultaneous" status="run" time="0.001" classname="TestEnv_Any" />
-    <testcase name="TestClose_Accept_CloseLater" status="run" time="0.001" classname="TestEnv_Any" />
-    <testcase name="TestClose_Accept_CloseFirst" status="run" time="0.001" classname="TestEnv_Any" />
-    <testcase name="TestClose_Accept_CloseSimultaneous" status="run" time="0.001" classname="TestEnv_Any" />
-    <testcase name="TestAccept_BeforeAccept" status="run" time="0.001" classname="TestEnv_Any" />
-    <testcase name="TestAccept_AfterAccept" status="run" time="0.001" classname="TestEnv_Any" />
-    <testcase name="TestAccept_MultipleInterface1" status="run" time="0.004" classname="TestEnv_Any" />
-    <testcase name="TestAccept_MultipleInterface2" status="run" time="0.003" classname="TestEnv_Any" />
-    <testcase name="TestConnect_BeforeAccept" status="run" time="0.001" classname="TestEnv_Any" />
+    <testcase name="TestClose_Accept_CloseLater" status="run" time="0.004" classname="TestEnv_Any">
+      <failure message="testclose.cpp:64&#x0A;Expected: (client_fd) &gt;= (0), actual: -1 vs 0" type=""><![CDATA[testclose.cpp:64
+Expected: (client_fd) >= (0), actual: -1 vs 0]]></failure>
+      <failure message="testclose.cpp:67&#x0A;Expected equality of these values:&#x0A;  client_addr.sin_family&#x0A;    Which is: &apos;\0&apos;&#x0A;  2" type=""><![CDATA[testclose.cpp:67
+Expected equality of these values:
+  client_addr.sin_family
+    Which is: '\0'
+  2]]></failure>
+      <failure message="testclose.cpp:72&#x0A;Expected equality of these values:&#x0A;  ret&#x0A;    Which is: -1&#x0A;  0" type=""><![CDATA[testclose.cpp:72
+Expected equality of these values:
+  ret
+    Which is: -1
+  0]]></failure>
+      <failure message="testclose.cpp:75&#x0A;Expected equality of these values:&#x0A;  addr.sin_family&#x0A;    Which is: &apos;\x2&apos; (2)&#x0A;  temp_addr.sin_family&#x0A;    Which is: &apos;P&apos; (80, 0x50)" type=""><![CDATA[testclose.cpp:75
+Expected equality of these values:
+  addr.sin_family
+    Which is: '\x2' (2)
+  temp_addr.sin_family
+    Which is: 'P' (80, 0x50)]]></failure>
+      <failure message="testclose.cpp:76&#x0A;Expected equality of these values:&#x0A;  addr.sin_port&#x0A;    Which is: 3879&#x0A;  temp_addr.sin_port&#x0A;    Which is: 195" type=""><![CDATA[testclose.cpp:76
+Expected equality of these values:
+  addr.sin_port
+    Which is: 3879
+  temp_addr.sin_port
+    Which is: 195]]></failure>
+      <failure message="testclose.cpp:83&#x0A;Expected equality of these values:&#x0A;  ret&#x0A;    Which is: -1&#x0A;  0" type=""><![CDATA[testclose.cpp:83
+Expected equality of these values:
+  ret
+    Which is: -1
+  0]]></failure>
+    </testcase>
+    <testcase name="TestClose_Accept_CloseFirst" status="run" time="0.004" classname="TestEnv_Any">
+      <failure message="testclose.cpp:64&#x0A;Expected: (client_fd) &gt;= (0), actual: -1 vs 0" type=""><![CDATA[testclose.cpp:64
+Expected: (client_fd) >= (0), actual: -1 vs 0]]></failure>
+      <failure message="testclose.cpp:67&#x0A;Expected equality of these values:&#x0A;  client_addr.sin_family&#x0A;    Which is: &apos;\0&apos;&#x0A;  2" type=""><![CDATA[testclose.cpp:67
+Expected equality of these values:
+  client_addr.sin_family
+    Which is: '\0'
+  2]]></failure>
+      <failure message="testclose.cpp:72&#x0A;Expected equality of these values:&#x0A;  ret&#x0A;    Which is: -1&#x0A;  0" type=""><![CDATA[testclose.cpp:72
+Expected equality of these values:
+  ret
+    Which is: -1
+  0]]></failure>
+      <failure message="testclose.cpp:75&#x0A;Expected equality of these values:&#x0A;  addr.sin_family&#x0A;    Which is: &apos;\x2&apos; (2)&#x0A;  temp_addr.sin_family&#x0A;    Which is: &apos;P&apos; (80, 0x50)" type=""><![CDATA[testclose.cpp:75
+Expected equality of these values:
+  addr.sin_family
+    Which is: '\x2' (2)
+  temp_addr.sin_family
+    Which is: 'P' (80, 0x50)]]></failure>
+      <failure message="testclose.cpp:76&#x0A;Expected equality of these values:&#x0A;  addr.sin_port&#x0A;    Which is: 3879&#x0A;  temp_addr.sin_port&#x0A;    Which is: 195" type=""><![CDATA[testclose.cpp:76
+Expected equality of these values:
+  addr.sin_port
+    Which is: 3879
+  temp_addr.sin_port
+    Which is: 195]]></failure>
+      <failure message="testclose.cpp:83&#x0A;Expected equality of these values:&#x0A;  ret&#x0A;    Which is: -1&#x0A;  0" type=""><![CDATA[testclose.cpp:83
+Expected equality of these values:
+  ret
+    Which is: -1
+  0]]></failure>
+    </testcase>
+    <testcase name="TestClose_Accept_CloseSimultaneous" status="run" time="0.006" classname="TestEnv_Any">
+      <failure message="testclose.cpp:64&#x0A;Expected: (client_fd) &gt;= (0), actual: -1 vs 0" type=""><![CDATA[testclose.cpp:64
+Expected: (client_fd) >= (0), actual: -1 vs 0]]></failure>
+      <failure message="testclose.cpp:67&#x0A;Expected equality of these values:&#x0A;  client_addr.sin_family&#x0A;    Which is: &apos;\0&apos;&#x0A;  2" type=""><![CDATA[testclose.cpp:67
+Expected equality of these values:
+  client_addr.sin_family
+    Which is: '\0'
+  2]]></failure>
+      <failure message="testclose.cpp:72&#x0A;Expected equality of these values:&#x0A;  ret&#x0A;    Which is: -1&#x0A;  0" type=""><![CDATA[testclose.cpp:72
+Expected equality of these values:
+  ret
+    Which is: -1
+  0]]></failure>
+      <failure message="testclose.cpp:75&#x0A;Expected equality of these values:&#x0A;  addr.sin_family&#x0A;    Which is: &apos;\x2&apos; (2)&#x0A;  temp_addr.sin_family&#x0A;    Which is: &apos;P&apos; (80, 0x50)" type=""><![CDATA[testclose.cpp:75
+Expected equality of these values:
+  addr.sin_family
+    Which is: '\x2' (2)
+  temp_addr.sin_family
+    Which is: 'P' (80, 0x50)]]></failure>
+      <failure message="testclose.cpp:76&#x0A;Expected equality of these values:&#x0A;  addr.sin_port&#x0A;    Which is: 3879&#x0A;  temp_addr.sin_port&#x0A;    Which is: 195" type=""><![CDATA[testclose.cpp:76
+Expected equality of these values:
+  addr.sin_port
+    Which is: 3879
+  temp_addr.sin_port
+    Which is: 195]]></failure>
+      <failure message="testclose.cpp:83&#x0A;Expected equality of these values:&#x0A;  ret&#x0A;    Which is: -1&#x0A;  0" type=""><![CDATA[testclose.cpp:83
+Expected equality of these values:
+  ret
+    Which is: -1
+  0]]></failure>
+    </testcase>
+    <testcase name="TestAccept_BeforeAccept" status="run" time="0.004" classname="TestEnv_Any">
+      <failure message="testhandshake.cpp:90&#x0A;Expected equality of these values:&#x0A;  (int)client_sockets.size()&#x0A;    Which is: 0&#x0A;  expected_accept&#x0A;    Which is: 1" type=""><![CDATA[testhandshake.cpp:90
+Expected equality of these values:
+  (int)client_sockets.size()
+    Which is: 0
+  expected_accept
+    Which is: 1]]></failure>
+    </testcase>
+    <testcase name="TestAccept_AfterAccept" status="run" time="0.003" classname="TestEnv_Any">
+      <failure message="testhandshake.cpp:90&#x0A;Expected equality of these values:&#x0A;  (int)client_sockets.size()&#x0A;    Which is: 0&#x0A;  expected_accept&#x0A;    Which is: 1" type=""><![CDATA[testhandshake.cpp:90
+Expected equality of these values:
+  (int)client_sockets.size()
+    Which is: 0
+  expected_accept
+    Which is: 1]]></failure>
+    </testcase>
+    <testcase name="TestAccept_MultipleInterface1" status="run" time="0.66" classname="TestEnv_Any">
+      <failure message="testhandshake.cpp:90&#x0A;Expected equality of these values:&#x0A;  (int)client_sockets.size()&#x0A;    Which is: 0&#x0A;  expected_accept&#x0A;    Which is: 5" type=""><![CDATA[testhandshake.cpp:90
+Expected equality of these values:
+  (int)client_sockets.size()
+    Which is: 0
+  expected_accept
+    Which is: 5]]></failure>
+      <failure message="testhandshake.cpp:90&#x0A;Expected equality of these values:&#x0A;  (int)client_sockets.size()&#x0A;    Which is: 0&#x0A;  expected_accept&#x0A;    Which is: 3" type=""><![CDATA[testhandshake.cpp:90
+Expected equality of these values:
+  (int)client_sockets.size()
+    Which is: 0
+  expected_accept
+    Which is: 3]]></failure>
+      <failure message="testhandshake.cpp:168&#x0A;Expected equality of these values:&#x0A;  (int)client_sockets.size()&#x0A;    Which is: 1&#x0A;  expected_connect&#x0A;    Which is: 5" type=""><![CDATA[testhandshake.cpp:168
+Expected equality of these values:
+  (int)client_sockets.size()
+    Which is: 1
+  expected_connect
+    Which is: 5]]></failure>
+      <failure message="testhandshake.cpp:168&#x0A;Expected equality of these values:&#x0A;  (int)client_sockets.size()&#x0A;    Which is: 1&#x0A;  expected_connect&#x0A;    Which is: 3" type=""><![CDATA[testhandshake.cpp:168
+Expected equality of these values:
+  (int)client_sockets.size()
+    Which is: 1
+  expected_connect
+    Which is: 3]]></failure>
+    </testcase>
+    <testcase name="TestAccept_MultipleInterface2" status="run" time="0.618" classname="TestEnv_Any">
+      <failure message="testhandshake.cpp:90&#x0A;Expected equality of these values:&#x0A;  (int)client_sockets.size()&#x0A;    Which is: 0&#x0A;  expected_accept&#x0A;    Which is: 2" type=""><![CDATA[testhandshake.cpp:90
+Expected equality of these values:
+  (int)client_sockets.size()
+    Which is: 0
+  expected_accept
+    Which is: 2]]></failure>
+      <failure message="testhandshake.cpp:90&#x0A;Expected equality of these values:&#x0A;  (int)client_sockets.size()&#x0A;    Which is: 0&#x0A;  expected_accept&#x0A;    Which is: 4" type=""><![CDATA[testhandshake.cpp:90
+Expected equality of these values:
+  (int)client_sockets.size()
+    Which is: 0
+  expected_accept
+    Which is: 4]]></failure>
+      <failure message="testhandshake.cpp:168&#x0A;Expected equality of these values:&#x0A;  (int)client_sockets.size()&#x0A;    Which is: 1&#x0A;  expected_connect&#x0A;    Which is: 2" type=""><![CDATA[testhandshake.cpp:168
+Expected equality of these values:
+  (int)client_sockets.size()
+    Which is: 1
+  expected_connect
+    Which is: 2]]></failure>
+      <failure message="testhandshake.cpp:168&#x0A;Expected equality of these values:&#x0A;  (int)client_sockets.size()&#x0A;    Which is: 1&#x0A;  expected_connect&#x0A;    Which is: 4" type=""><![CDATA[testhandshake.cpp:168
+Expected equality of these values:
+  (int)client_sockets.size()
+    Which is: 1
+  expected_connect
+    Which is: 4]]></failure>
+    </testcase>
+    <testcase name="TestConnect_BeforeAccept" status="run" time="0.002" classname="TestEnv_Any" />
     <testcase name="TestConnect_AfterAccept" status="run" time="0.001" classname="TestEnv_Any" />
     <testcase name="TestConnect_SimultaneousConnect" status="run" time="0.001" classname="TestEnv_Any" />
   </testsuite>

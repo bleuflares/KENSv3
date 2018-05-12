@@ -18,13 +18,10 @@
 
 
 #include <E/E_TimerModule.hpp>
+#include <array>
 
 namespace E
 {
-
-class TCPAssignment : public HostModule, public NetworkModule, public SystemCallInterface, private NetworkLog, private TimerModule
-{
-private:
 
 	#define BUF_SIZE 51200
 	#define MSS 1460
@@ -34,7 +31,7 @@ private:
 	enum Close_State {UNCLOSED, CLOSED};
 	enum TCP_State {TCP_CLOSED, TCP_LISTEN, TCP_SYN_SENT, TCP_SYN_RCVD, TCP_ESTABLISHED, TCP_CLOSE_WAIT, TCP_LAST_ACK, TCP_FIN_WAIT_1, TCP_FIN_WAIT_2, TCP_CLOSING, TCP_TIME_WAIT};
 	enum TCP_Flags {SYN = 0x02, SYNACK = 0x12, ACK = 0x10, FIN = 0x01};
-	enum Payload_Type {SOCKET, CONNECTION, PACKET};
+	enum Payload_Type {PAYLOAD_SOCKET, PAYLOAD_CONNECTION, PAYLOAD_PACKET};
 
 	struct timer_payload
 	{
@@ -131,6 +128,9 @@ private:
 		struct timer_payload *retransmit_timer;
 	};
 
+class TCPAssignment : public HostModule, public NetworkModule, public SystemCallInterface, private NetworkLog, private TimerModule
+{
+private:
 	std::map<std::array<int, 2>, struct sock_info> fd_to_socket;
 
 private:

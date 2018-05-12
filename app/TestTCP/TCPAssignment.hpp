@@ -33,7 +33,7 @@ private:
 	enum Close_State {UNCLOSED, CLOSED};
 	enum TCP_State {TCP_CLOSED, TCP_LISTEN, TCP_SYN_SENT, TCP_SYN_RCVD, TCP_ESTABLISHED, TCP_CLOSE_WAIT, TCP_LAST_ACK, TCP_FIN_WAIT_1, TCP_FIN_WAIT_2, TCP_CLOSING, TCP_TIME_WAIT};
 	enum TCP_Flags {SYN = 0x02, SYNACK = 0x12, ACK = 0x10, FIN = 0x01};
-	enum Payload_Type {SOCKET, CONNECTION};
+	enum Payload_Type {SOCKET, CONNECTION, PACKET};
 
 	
 	struct connection
@@ -65,13 +65,16 @@ private:
 		std::list<struct read_info> reads;
 		struct read_buffer rb;
 		bool read_called;
+		void *read_buf;
 		size_t read_count;
 		struct write_manager wmgr;
 		struct write_buffer wb;
 		bool write_called;
+		void *write_buf;
 		size_t write_count;
 		uint16_t rwnd;
 		int dup_ack_count;
+		struct timer_payload *retransmit_timer;
 	};
 
 	struct timer_payload

@@ -65,14 +65,13 @@ private:
 		std::list<struct read_info> reads;
 		struct read_buffer rb;
 		bool read_called;
-		void *read_buf;
 		size_t read_count;
 		struct write_manager wmgr;
 		struct write_buffer wb;
 		bool write_called;
-		void *write_buf;
 		size_t write_count;
 		uint16_t rwnd;
+		int dup_ack_count;
 	};
 
 	struct timer_payload
@@ -88,7 +87,7 @@ private:
 		size_t start;
 		size_t end;
 		size_t size;
-		uint32_t seq_num;	
+		uint32_t seq_num;
 	};
 
 	struct write_manager

@@ -541,6 +541,36 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 
 				rcv_socket->tcp_state = TCP_CLOSE_WAIT;
 			}
+			else if(flags == ACK)
+			{
+				if(rcv_socket->smallest_unacked == ack_num)
+				{
+					rcv_socket->dup_ack_count++;
+					if(rcv_socket->dup_ack_count == 3)
+					{
+						rcv_socket->dup_ack_count = 0;
+						//retransmit all
+					}
+				}
+				else
+				{
+					rcv_socket->smallest_unacked = ack_num;
+					//if write_info's seq_num == ack_num retransmit from there
+					for(auto wi_iter = rcv_socket->wmgr.write_infos.begin(); wi_iter != socket->wmgr.write_infos.end(); ++wi_iter)
+					{
+						if(&*wi_iter->seq_num == ack_num)
+						{
+							rcv_socket->smallest_unacked = ack_num;
+							//retransmit from here
+							break;
+						}
+						else
+						{
+							rcv_socket->wmgr.write_infos.erase(wi_iter);
+						}
+					}
+				}
+			}
 			break;
 
 		case TCP_LAST_ACK:
@@ -1048,14 +1078,60 @@ void TCPAssignment::syscall_write(UUID syscallUUID, int pid, int fd, const void 
 		return;
 	}
 
-	if(count <= socket->wb.size)
+	if(count <= socket->rwnd - socket->wb.size)
 	{
 		size_t write_count = wb_write(socket->wb, buf, count);
 
-		while(socket->rwnd > socket->wmgr.size)
+		uint32_t seg_len = MSS;
+		while(seg_len > 0) //socket->wb.size?
 		{
+			seg_len = write_count >= MSS ? MSS : write_count;
+			write_count -= seg_len;
+
 			struct write_info wi;
-			//send packet
+			wi.start = socket->wb.end;
+			wi.end = wi.start += seg_len;
+			wi.size = seg_len;
+			wi.seq_num = socket->seq_num;
+
+			uint32_t packet_seq_num = htonl(socket->seq_num);
+			uint32_t packet_ack_num = htonl(0x00000000);
+			uint8_t packet_headerlen = (uint8_t) 0x50;
+			uint8_t packet_flags = (uint8_t) ACK;
+			uint16_t packet_rwnd = (uint16_t) htons(BUF_SIZE);
+			uint16_t packet_checksum = (uint16_t) 0x0000;
+			uint16_t packet_pointer = (uint16_t) 0x0000;
+
+			Packet *wr_pkt = this->allocatePacket(14 + 20 + 20 + seg_len);
+			wr_pkt->writeData(14 + 12, &((struct sockaddr_in *)&socket->src_addr)->sin_addr.s_addr, 4);
+			wr_pkt->writeData(14 + 16, &((struct sockaddr_in *)&socket->dst_addr)->sin_addr.s_addr, 4);
+			wr_pkt->writeData(14 + 20 + 0, &((struct sockaddr_in *)&socket->src_addr)->sin_port, 2);
+			wr_pkt->writeData(14 + 20 + 2, &((struct sockaddr_in *)&socket->dst_addr)->sin_port, 2);
+			wr_pkt->writeData(14 + 20 + 4, &packet_seq_num, 4);
+			wr_pkt->writeData(14 + 20 + 8, &packet_ack_num, 4);
+			wr_pkt->writeData(14 + 20 + 12, &packet_headerlen, 1);
+			wr_pkt->writeData(14 + 20 + 13, &packet_flags, 1);
+			wr_pkt->writeData(14 + 20 + 14, &packet_rwnd, 2);
+			wr_pkt->writeData(14 + 20 + 16, &packet_checksum, 2);
+			wr_pkt->writeData(14 + 20 + 18, &packet_pointer, 2);
+
+			uint32_t source, dest;
+			uint8_t tcp_seg[20];
+			wr_pkt->readData(14 + 12, &source, sizeof(source));
+			wr_pkt->readData(14 + 16, &dest, sizeof(dest));
+			wr_pkt->readData(14 + 20, tcp_seg, sizeof(tcp_seg));
+			
+			packet_checksum = htons(0xFFFF - NetworkUtil::tcp_sum(source, dest, tcp_seg, sizeof(tcp_seg)));
+			wr_pkt->writeData(14 + 20 + 16, &packet_checksum, 2);
+
+			wr_pkt->writeData(14 + 20 + 20, wi.start ,seg_len);
+
+			this->sendPacket("IPv4", wr_pkt);
+
+			socket->wmgr.write_infos.push_back(wi);
+			socket->wmgr.end = wi.end;
+			socket->wmgr.size += wi.size;
+			socket->seq_num += seg_len;
 		}
 
 		this->returnSystemCall(syscallUUID, write_count);

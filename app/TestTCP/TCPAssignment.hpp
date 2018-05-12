@@ -25,8 +25,12 @@ namespace E
 class TCPAssignment : public HostModule, public NetworkModule, public SystemCallInterface, private NetworkLog, private TimerModule
 {
 private:
+
+	#define BUF_SIZE 51200
+
 	enum Bound_State {UNBOUND, BOUND};
 	enum Connection_State {UNCONNECTED, CONNECTED};
+	enum Close_State {UNCLOSED, CLOSED};
 	enum TCP_State {TCP_CLOSED, TCP_LISTEN, TCP_SYN_SENT, TCP_SYN_RCVD, TCP_ESTABLISHED, TCP_CLOSE_WAIT, TCP_LAST_ACK, TCP_FIN_WAIT_1, TCP_FIN_WAIT_2, TCP_CLOSING, TCP_TIME_WAIT};
 	enum TCP_Flags {SYN = 0x02, SYNACK = 0x12, ACK = 0x10, FIN = 0x01};
 	enum Payload_Type {SOCKET, CONNECTION};
@@ -36,7 +40,6 @@ private:
 	{
 		sockaddr src_addr;
 		sockaddr dst_addr;
-		enum Connection_State connection_state;
 		enum TCP_State tcp_state;
 		uint32_t seq_num;
 		uint32_t ack_num;
@@ -50,14 +53,26 @@ private:
 		sockaddr dst_addr;
 		enum Bound_State bound_state;
 		enum Connection_State connection_state;
+		enum Close_State close_state;
 		enum TCP_State tcp_state;
 		int backlog;
 		uint32_t seq_num;
 		uint32_t ack_num;
-		std::list<struct connection> connections;
+		std::list<struct connection> connections;		
 		bool accept_called;
 		sockaddr *accept_addr;
 		socklen_t *accept_addrlen;
+		std::list<struct read_info> reads;
+		struct read_buffer rb;
+		bool read_called;
+		void *read_buf;
+		size_t read_count;
+		struct write_manager wmgr;
+		struct write_buffer wb;
+		bool write_called;
+		void *write_buf;
+		size_t write_count;
+		uint16_t rwnd;
 	};
 
 	struct timer_payload
@@ -66,6 +81,48 @@ private:
 		enum Payload_Type type;
 		struct sock_info *socket;
 		struct connection *connection;
+	};
+
+	struct read_info
+	{
+		size_t start;
+		size_t end;
+		size_t size;
+		uint32_t seq_num;	
+	};
+
+	struct write_manager
+	{
+		std::list<struct write_info> write_infos;
+		size_t start;
+		size_t end;
+		size_t size;
+	};
+
+	struct write_info
+	{
+		size_t start;
+		size_t end;
+		size_t size;
+		uint32_t seq_num;
+	};
+
+	struct read_buffer
+	{
+		uint8_t buffer[BUF_SIZE + 1];
+		size_t start;
+		size_t cont_end;
+		size_t end;
+		size_t cont_size;
+		size_t size;
+	};
+
+	struct write_buffer
+	{
+		uint8_t buffer[BUF_SIZE + 1];
+		size_t start;
+		size_t end;
+		size_t size;
 	};
 
 	std::map<std::array<int, 2>, struct sock_info> fd_to_socket;
@@ -82,11 +139,11 @@ public:
 	void syscall_socket(UUID syscallUUID, int pid, int domain, int type__unused);
 
 	void syscall_close(UUID syscallUUID, int pid, int fd);
-	/*
-	void TCPAssignment::syscall_read(syscallUUID, pid, param.param1_int, param.param2_ptr, param.param3_int);
 
-	void TCPAssignment::syscall_write(syscallUUID, pid, param.param1_int, param.param2_ptr, param.param3_int);
-	*/
+	void syscall_read(UUID syscallUUID, int pid, int fd, void *buf, size_t count);
+
+	void syscall_write(UUID syscallUUID, int pid, int fd, const void *buf, size_t count);
+
 	void syscall_connect(UUID syscallUUID, int pid, int sockfd,
 		struct sockaddr *addr, socklen_t addrlen);
 

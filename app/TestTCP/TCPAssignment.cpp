@@ -641,7 +641,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 				}
 				else
 				{
-					if(rcv_socket->smallest_unacked == ack_num)
+					if(rcv_socket->wmgr.write_infos.begin().seq_num == ack_num)
 					{
 						rcv_socket->dup_ack_count++;
 						if(rcv_socket->dup_ack_count >= 3)
@@ -651,7 +651,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 
 							rcv_socket->dup_ack_count = 0;
 
-							struct write_manager wmgr = rcv_socket.wmgr;
+							struct write_manager wmgr = rcv_socket->wmgr;
 							for(auto wi_iter = wmgr.write_infos.begin(); wi_iter != wmgr.write_infos.end(); ++wi_iter)
 							{
 								struct write_info *wi = &*wi_iter;
@@ -1883,12 +1883,6 @@ size_t wb_write(struct write_buffer wb, const void *buf, size_t count)
 	}
 	wb.size += count;
 	return count;
-}
-
-void retransmit(struct sock_info socket)
-{
-	
-
 }
 
 }

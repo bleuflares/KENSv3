@@ -27,6 +27,7 @@ class TCPAssignment : public HostModule, public NetworkModule, public SystemCall
 private:
 
 	#define BUF_SIZE 51200
+	#define MSS 1460
 
 	enum Bound_State {UNBOUND, BOUND};
 	enum Connection_State {UNCONNECTED, CONNECTED};
@@ -45,47 +46,7 @@ private:
 		uint32_t ack_num;
 	};
 
-	struct sock_info
-	{
-		UUID uuid;
-		int pid;
-		sockaddr src_addr;
-		sockaddr dst_addr;
-		enum Bound_State bound_state;
-		enum Connection_State connection_state;
-		enum Close_State close_state;
-		enum TCP_State tcp_state;
-		int backlog;
-		uint32_t seq_num;
-		uint32_t ack_num;
-		std::list<struct connection> connections;		
-		bool accept_called;
-		sockaddr *accept_addr;
-		socklen_t *accept_addrlen;
-		std::list<struct read_info> reads;
-		struct read_buffer rb;
-		bool read_called;
-		void *read_buf;
-		size_t read_count;
-		struct write_manager wmgr;
-		struct write_buffer wb;
-		bool write_called;
-		void *write_buf;
-		size_t write_count;
-		uint16_t rwnd;
-		int dup_ack_count;
-		struct timer_payload *retransmit_timer;
-	};
-
-	struct timer_payload
-	{
-		UUID uuid;
-		enum Payload_Type type;
-		struct sock_info *socket;
-		struct connection *connection;
-	};
-
-	struct read_info
+		struct read_info
 	{
 		size_t start;
 		size_t end;
@@ -125,6 +86,46 @@ private:
 		size_t start;
 		size_t end;
 		size_t size;
+	};
+
+	struct sock_info
+	{
+		UUID uuid;
+		int pid;
+		sockaddr src_addr;
+		sockaddr dst_addr;
+		enum Bound_State bound_state;
+		enum Connection_State connection_state;
+		enum Close_State close_state;
+		enum TCP_State tcp_state;
+		int backlog;
+		uint32_t seq_num;
+		uint32_t ack_num;
+		std::list<struct connection> connections;		
+		bool accept_called;
+		sockaddr *accept_addr;
+		socklen_t *accept_addrlen;
+		struct read_buffer rb;
+		bool read_called;
+		void *read_buf;
+		size_t read_count;
+		struct write_manager wmgr;
+		struct write_buffer wb;
+		bool write_called;
+		void *write_buf;
+		size_t write_count;
+		uint32_t smallest_unacked;
+		uint16_t rwnd;
+		int dup_ack_count;
+		struct timer_payload *retransmit_timer;
+	};
+
+	struct timer_payload
+	{
+		UUID uuid;
+		enum Payload_Type type;
+		struct sock_info *socket;
+		struct connection *connection;
 	};
 
 	std::map<std::array<int, 2>, struct sock_info> fd_to_socket;
@@ -170,6 +171,12 @@ public:
 protected:
 	virtual void systemCallback(UUID syscallUUID, int pid, const SystemCallParameter& param) final;
 	virtual void packetArrived(std::string fromModule, Packet* packet) final;
+
+	size_t rb_read(struct read_buffer rb, void *buf, size_t count);
+	size_t rb_write(struct read_buffer rb, const void *buf, size_t count);
+	size_t rb_pos_write(struct read_buffer rb, size_t pos, const void *buf, size_t count);
+	size_t wb_read(struct write_buffer wb, void *buf, size_t count);
+	size_t wb_write(struct write_buffer wb, const void *buf, size_t count);
 };
 
 class TCPAssignmentProvider

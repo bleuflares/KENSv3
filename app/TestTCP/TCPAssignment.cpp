@@ -97,6 +97,8 @@ void TCPAssignment::systemCallback(UUID syscallUUID, int pid, const SystemCallPa
 
 void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 {
+	uint16_t total_len;
+	uint16_t payload_len;
 	uint16_t src_port;
 	uint16_t dst_port;
 	uint32_t seq_num;
@@ -108,8 +110,6 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 
 	uint32_t src_ip, dst_ip;
 	uint8_t tcp_seg[20];
-	uint16_t total_len;
-	packet->readData(14 + 2, &total_len, sizeof(total_len));
 	packet->readData(14 + 12, &src_ip, sizeof(src_ip));
 	packet->readData(14 + 16, &dst_ip, sizeof(dst_ip));
 	packet->readData(14 + 20, tcp_seg, sizeof(tcp_seg));
@@ -120,6 +120,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 		return;
 	}
 
+	packet->readData(14 + 2, &total_len, sizeof(total_len));
 	packet->readData(14 + 20 + 0, &src_port, sizeof(src_port));
 	packet->readData(14 + 20 + 2, &dst_port, sizeof(dst_port));
 	packet->readData(14 + 20 + 4, &seq_num, sizeof(seq_num));
@@ -128,6 +129,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 	packet->readData(14 + 20 + 13, &flags, sizeof(flags));
 	packet->readData(14 + 20 + 14, &rwnd, sizeof(rwnd));
 	packet->readData(14 + 20 + 18, &urg_ptr, sizeof(urg_ptr));
+	payload_len = ntohs(total_len) - 40;
 	seq_num = ntohl(seq_num);
 	ack_num = ntohl(ack_num);
 	rwnd = ntohs(rwnd);
@@ -513,7 +515,6 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 			break;
 
 		case TCP_ESTABLISHED:
-			uint16_t payload_len = ntohs(total_len) - 40;
 			if(flags == FIN)
 			{
 				rcv_socket->ack_num = seq_num + 1;
@@ -657,9 +658,9 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 								struct write_info *wi = &*wi_iter;
 
 								uint8_t payload[MSS];
-								size_t payload_len = wb_read(rcv_socket->wb, payload, wi->size);
+								size_t read_count = wb_read(rcv_socket->wb, payload, wi->size);
 
-								uint16_t packet_totallen = htons(payload_len);
+								uint16_t packet_totallen = htons(read_count);
 								uint32_t packet_seq_num = htonl(wi->seq_num);
 								uint32_t packet_ack_num = htonl(0x00000000);
 								uint8_t packet_headerlen = (uint8_t) 0x50;
@@ -681,7 +682,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 								wr_pkt->writeData(14 + 20 + 14, &packet_rwnd, 2);
 								wr_pkt->writeData(14 + 20 + 16, &packet_checksum, 2);
 								wr_pkt->writeData(14 + 20 + 18, &packet_pointer, 2);
-								wr_pkt->writeData(14 + 20 + 20, payload, payload_len);
+								wr_pkt->writeData(14 + 20 + 20, payload, read_count);
 
 								uint32_t source, dest;
 								uint8_t tcp_seg[20];
@@ -741,7 +742,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 							}
 						}
 
-						if(0 <= rcv_socket->rwnd - rcv_socket->wmgr.size)
+						if(rcv_socket->rwnd >= rcv_socket->wmgr.size)
 						{
 							uint32_t seg_len;
 							while(rcv_socket->wb.size - rcv_socket->wmgr.size > 0)
@@ -755,9 +756,9 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 								wi.seq_num = rcv_socket->seq_num;
 
 								uint8_t payload[MSS];
-								size_t payload_len = wb_read(rcv_socket->wb, payload, wi.size);
+								size_t read_count = wb_read(rcv_socket->wb, payload, wi.size);
 
-								uint16_t packet_totallen = htons(payload_len);
+								uint16_t packet_totallen = htons(read_count);
 								uint32_t packet_seq_num = htonl(rcv_socket->seq_num);
 								uint32_t packet_ack_num = htonl(0x00000000);
 								uint8_t packet_headerlen = (uint8_t) 0x50;
@@ -779,7 +780,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 								wr_pkt->writeData(14 + 20 + 14, &packet_rwnd, 2);
 								wr_pkt->writeData(14 + 20 + 16, &packet_checksum, 2);
 								wr_pkt->writeData(14 + 20 + 18, &packet_pointer, 2);
-								wr_pkt->writeData(14 + 20 + 20, payload, payload_len);
+								wr_pkt->writeData(14 + 20 + 20, payload, read_count);
 
 								uint32_t source, dest;
 								uint8_t tcp_seg[20];
@@ -1383,7 +1384,7 @@ void TCPAssignment::syscall_write(UUID syscallUUID, int pid, int fd, const void 
 
 		this->returnSystemCall(syscallUUID, write_count);
 
-		if(0 <= socket->rwnd - socket->wmgr.size)
+		if(socket->rwnd >= socket->wmgr.size)
 		{
 			uint32_t seg_len;
 			while(socket->wb.size - socket->wmgr.size > 0)
@@ -1434,7 +1435,7 @@ void TCPAssignment::syscall_write(UUID syscallUUID, int pid, int fd, const void 
 
 				this->sendPacket("IPv4", wr_pkt);
 
-				if(rsocket->wmgr.write_infos.empty())
+				if(socket->wmgr.write_infos.empty())
 				{
 					struct timer_payload *timer = new struct timer_payload;
 					timer->type = PACKET;

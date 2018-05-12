@@ -36,17 +36,23 @@ private:
 	enum TCP_Flags {SYN = 0x02, SYNACK = 0x12, ACK = 0x10, FIN = 0x01};
 	enum Payload_Type {SOCKET, CONNECTION, PACKET};
 
-	
-	struct connection
+	struct timer_payload
 	{
-		sockaddr src_addr;
-		sockaddr dst_addr;
-		enum TCP_State tcp_state;
+		UUID uuid;
+		enum Payload_Type type;
+		struct sock_info *socket;
+		struct connection *connection;
+	};
+	
+	struct read_info
+	{
+		size_t start;
+		size_t end;
+		size_t size;
 		uint32_t seq_num;
-		uint32_t ack_num;
 	};
 
-		struct read_info
+	struct write_info
 	{
 		size_t start;
 		size_t end;
@@ -60,14 +66,6 @@ private:
 		size_t start;
 		size_t end;
 		size_t size;
-	};
-
-	struct write_info
-	{
-		size_t start;
-		size_t end;
-		size_t size;
-		uint32_t seq_num;
 	};
 
 	struct read_buffer
@@ -88,6 +86,15 @@ private:
 		size_t size;
 	};
 
+	struct connection
+	{
+		sockaddr src_addr;
+		sockaddr dst_addr;
+		enum TCP_State tcp_state;
+		uint32_t seq_num;
+		uint32_t ack_num;
+	};
+
 	struct sock_info
 	{
 		UUID uuid;
@@ -101,31 +108,27 @@ private:
 		int backlog;
 		uint32_t seq_num;
 		uint32_t ack_num;
-		std::list<struct connection> connections;		
+		std::list<struct connection> connections;
+
 		bool accept_called;
 		sockaddr *accept_addr;
 		socklen_t *accept_addrlen;
 		struct read_buffer rb;
+
 		bool read_called;
 		const void *read_buf;
 		size_t read_count;
 		struct write_manager wmgr;
 		struct write_buffer wb;
+
 		bool write_called;
 		const void *write_buf;
 		size_t write_count;
 		uint32_t smallest_unacked;
 		uint16_t rwnd;
+
 		int dup_ack_count;
 		struct timer_payload *retransmit_timer;
-	};
-
-	struct timer_payload
-	{
-		UUID uuid;
-		enum Payload_Type type;
-		struct sock_info *socket;
-		struct connection *connection;
 	};
 
 	std::map<std::array<int, 2>, struct sock_info> fd_to_socket;

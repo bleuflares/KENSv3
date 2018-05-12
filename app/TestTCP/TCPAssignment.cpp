@@ -729,7 +729,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 
 						if(rcv_socket->write_called)
 						{
-							if(rcv_socket->write_count <= BUF_SIZE - socket->wb.size)
+							if(rcv_socket->write_count <= BUF_SIZE - rcv_socket->wb.size)
 							{
 								size_t write_count = wb_write(rcv_socket->wb, rcv_socket->write_buf, rcv_socket->write_count);
 
@@ -1007,7 +1007,7 @@ void TCPAssignment::timerCallback(void *payload)
 		struct sock_info *socket = timer->socket;
 		socket->dup_ack_count = 0;
 
-		struct write_manager wmgr = socket.wmgr;
+		struct write_manager wmgr = socket->wmgr;
 		for(auto wi_iter = wmgr.write_infos.begin(); wi_iter != wmgr.write_infos.end(); ++wi_iter)
 		{
 			struct write_info *wi = &*wi_iter;
@@ -1399,8 +1399,6 @@ void TCPAssignment::syscall_write(UUID syscallUUID, int pid, int fd, const void 
 				uint8_t payload[MSS];
 				size_t payload_len = wb_read(socket->wb, payload, wi.size);
 
-				wr_pkt->writeData(14 + 20 + 20, payload, payload_len);
-
 				uint16_t packet_totallen = htons(wi.size);
 				uint32_t packet_seq_num = htonl(socket->seq_num);
 				uint32_t packet_ack_num = htonl(0x00000000);
@@ -1423,6 +1421,7 @@ void TCPAssignment::syscall_write(UUID syscallUUID, int pid, int fd, const void 
 				wr_pkt->writeData(14 + 20 + 14, &packet_rwnd, 2);
 				wr_pkt->writeData(14 + 20 + 16, &packet_checksum, 2);
 				wr_pkt->writeData(14 + 20 + 18, &packet_pointer, 2);
+				wr_pkt->writeData(14 + 20 + 20, payload, payload_len);
 
 				uint32_t source, dest;
 				uint8_t tcp_seg[20];

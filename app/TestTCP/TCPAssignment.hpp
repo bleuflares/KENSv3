@@ -107,12 +107,12 @@ private:
 		socklen_t *accept_addrlen;
 		struct read_buffer rb;
 		bool read_called;
-		void *read_buf;
+		const void *read_buf;
 		size_t read_count;
 		struct write_manager wmgr;
 		struct write_buffer wb;
 		bool write_called;
-		void *write_buf;
+		const void *write_buf;
 		size_t write_count;
 		uint32_t smallest_unacked;
 		uint16_t rwnd;

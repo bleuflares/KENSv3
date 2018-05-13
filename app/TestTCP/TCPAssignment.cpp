@@ -296,6 +296,8 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 							struct sock_info s_socket;
 							static struct read_buffer empty_rb;
 							static struct write_buffer empty_wb;
+							static struct read_buffer empty_rb;
+							static struct write_manager empty_wmgr;
 							s_socket.uuid = 0;
 							s_socket.pid = rcv_socket->pid;
 							s_socket.src_addr = connection->src_addr;
@@ -314,10 +316,15 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 							s_socket.read_called = false;
 							s_socket.read_buf = NULL;
 							s_socket.read_count = 0;
+							s_socket.wmgr = empty_wmgr;
 							s_socket.wb = empty_wb;
 							s_socket.write_called = false;
 							s_socket.write_buf = NULL;
 							s_socket.write_count = 0;
+							s_socket.smallest_unacked = s_socket.seq_num;
+							s_socket.rwnd = 0;
+							s_socket.dup_ack_count = 0;
+							s_socket.retransmit_timer = NULL;
 
 							rcv_socket->connections.erase(connection_iter);
 							fd_to_socket.insert(std::pair<std::array<int, 2>, sock_info>(fd_to_pid, s_socket));
@@ -735,7 +742,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 						{
 							if(rcv_socket->write_count <= BUF_SIZE - rcv_socket->wb.size)
 							{
-								size_t write_count = wb_write(rcv_socket->wb, rcv_socket->write_buf, rcv_socket->write_count);
+								size_t write_count = wb_write(&rcv_socket->wb, rcv_socket->write_buf, rcv_socket->write_count);
 
 								rcv_socket->write_called = false;
 								rcv_socket->write_buf = NULL;
@@ -1081,6 +1088,7 @@ void TCPAssignment::syscall_socket(UUID syscallUUID, int pid, int domain, int ty
 	static struct sockaddr empty_addr;
 	static struct read_buffer empty_rb;
 	static struct write_buffer empty_wb;
+	static struct write_manager empty_wmgr;
 	socket.uuid = 0;
 	socket.pid = pid;
 	socket.src_addr = empty_addr;
@@ -1099,10 +1107,15 @@ void TCPAssignment::syscall_socket(UUID syscallUUID, int pid, int domain, int ty
 	socket.read_called = false;
 	socket.read_buf = NULL;
 	socket.read_count = 0;
+	socket.wmgr = empty_wmgr;
 	socket.wb = empty_wb;
 	socket.write_called = false;
 	socket.write_buf = NULL;
 	socket.write_count = 0;
+	socket.smallest_unacked = socket.seq_num;
+	socket.rwnd = 0;
+	socket.dup_ack_count = 0;
+	socket.retransmit_timer = NULL;
 
 	fd_to_socket.insert(std::pair<std::array<int, 2>, sock_info>(fd_to_pid, socket));
 
@@ -1361,39 +1374,49 @@ void TCPAssignment::syscall_read(UUID syscallUUID, int pid, int fd, void *buf, s
 
 void TCPAssignment::syscall_write(UUID syscallUUID, int pid, int fd, const void *buf, size_t count)
 {
+	printf("syscall_write called \n");
 	std::array<int, 2> fd_to_pid = {fd, pid};
 	auto socket_iter = fd_to_socket.find(fd_to_pid);
 	if(socket_iter == fd_to_socket.end())
 	{
+		printf("error 1\n");
 		this->returnSystemCall(syscallUUID, -1);
 		return;
 	}
 	struct sock_info *socket = &socket_iter->second;
 	if(socket->pid != pid)
 	{
+		printf("error 2\n");
 		this->returnSystemCall(syscallUUID, -1);
 		return;
 	}
 
 	if(socket->connection_state != CONNECTED || socket->close_state != UNCLOSED)
 	{
+		printf("error 3\n");
 		this->returnSystemCall(syscallUUID, -1);
 		return;
 	}
 
 	if(count <= BUF_SIZE - socket->wb.size)
 	{
-		size_t write_count = wb_write(socket->wb, buf, count);
+		size_t write_count = wb_write(&socket->wb, buf, count);
+
+		printf("count, write_count is %d %d \n", (int)count, (int)write_count);
 
 		this->returnSystemCall(syscallUUID, write_count);
 
 		if(socket->rwnd >= socket->wmgr.size)
 		{
+			printf("enough rwnd\n");
 			uint32_t seg_len;
+			printf("wb.size is %d, wmgr.size is %d \n", socket->wb.size, socket->wmgr.size);
+
 			while(socket->wb.size - socket->wmgr.size > 0)
 			{
 				seg_len = socket->wb.size - socket->wmgr.size >= MSS ? MSS : socket->wb.size - socket->wmgr.size;
 
+				printf("seg_len is %d \n", (int)seg_len);
 				struct write_info wi;
 				wi.start = socket->wb.end;
 				wi.end = (wi.start + seg_len) % (BUF_SIZE + 1);
@@ -1438,6 +1461,8 @@ void TCPAssignment::syscall_write(UUID syscallUUID, int pid, int fd, const void 
 
 				this->sendPacket("IPv4", wr_pkt);
 
+				printf("sent packet \n");
+
 				if(socket->wmgr.write_infos.empty())
 				{
 					struct timer_payload *timer = new struct timer_payload;
@@ -1460,6 +1485,7 @@ void TCPAssignment::syscall_write(UUID syscallUUID, int pid, int fd, const void 
 	}
 	else
 	{
+		printf("write blocked\n");
 		socket->write_called = true;
 		socket->write_buf = buf;
 		socket->write_count = count;
@@ -1654,6 +1680,7 @@ void TCPAssignment::syscall_accept(UUID syscallUUID, int pid, int sockfd,
 		struct sock_info s_socket;
 		static struct read_buffer empty_rb;
 		static struct write_buffer empty_wb;
+		static struct write_manager empty_wmgr;
 		s_socket.uuid = 0;
 		s_socket.pid = pid;
 		s_socket.src_addr = connection->src_addr;
@@ -1672,10 +1699,15 @@ void TCPAssignment::syscall_accept(UUID syscallUUID, int pid, int sockfd,
 		s_socket.read_called = false;
 		s_socket.read_buf = NULL;
 		s_socket.read_count = 0;
+		s_socket.wmgr = empty_wmgr;
 		s_socket.wb = empty_wb;
 		s_socket.write_called = false;
 		s_socket.write_buf = NULL;
 		s_socket.write_count = 0;
+		s_socket.smallest_unacked = s_socket.seq_num;
+		s_socket.rwnd = 0;
+		s_socket.dup_ack_count = 0;
+		s_socket.retransmit_timer = NULL;
 
 		l_socket->connections.erase(connection_iter);
 		fd_to_socket.insert(std::pair<std::array<int, 2>, sock_info>(fd_to_pid, s_socket));
@@ -1868,20 +1900,22 @@ size_t TCPAssignment::wb_read(struct write_buffer wb, void *buf, size_t count)
 }
 
 
-size_t TCPAssignment::wb_write(struct write_buffer wb, const void *buf, size_t count)
+size_t TCPAssignment::wb_write(struct write_buffer *wb, const void *buf, size_t count)
 {
-	if(wb.end + count > BUF_SIZE)
+	if(wb->end + count > BUF_SIZE)
 	{
-		memcpy(wb.buffer + wb.end, buf, BUF_SIZE - wb.end);
-		memcpy(wb.buffer, (uint8_t *)buf + (BUF_SIZE - wb.end), count - (BUF_SIZE - wb.end));
-		wb.end = count - (BUF_SIZE - wb.end);
+		memcpy(wb->buffer + wb->end, buf, BUF_SIZE - wb->end);
+		memcpy(wb->buffer, (uint8_t *)buf + (BUF_SIZE - wb->end), count - (BUF_SIZE - wb->end));
+		wb->end = count - (BUF_SIZE - wb->end);
 	}
 	else
 	{
-		memcpy(wb.buffer + wb.end, buf, count);
-		wb.end += count;
+		memcpy(wb->buffer + wb->end, buf, count);
+		wb->end += count;
 	}
-	wb.size += count;
+	wb->size += count;
+
+	printf("wb.size is %d \n", wb->size);
 	return count;
 }
 

@@ -179,7 +179,7 @@ protected:
 	size_t rb_write(struct read_buffer rb, const void *buf, size_t count);
 	size_t rb_pos_write(struct read_buffer rb, size_t pos, const void *buf, size_t count);
 	size_t wb_read(struct write_buffer wb, void *buf, size_t count);
-	size_t wb_write(struct write_buffer wb, const void *buf, size_t count);
+	size_t wb_write(struct write_buffer *wb, const void *buf, size_t count);
 };
 
 class TCPAssignmentProvider

@@ -114,6 +114,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 	packet->readData(14 + 16, &dst_ip, sizeof(dst_ip));
 	packet->readData(14 + 20, tcp_seg, sizeof(tcp_seg));
 
+
 	if(NetworkUtil::tcp_sum(src_ip, dst_ip, tcp_seg, sizeof(tcp_seg)) != 0xFFFF)
 	{
 		this->freePacket(packet);
@@ -1373,7 +1374,6 @@ void TCPAssignment::syscall_read(UUID syscallUUID, int pid, int fd, void *buf, s
 
 void TCPAssignment::syscall_write(UUID syscallUUID, int pid, int fd, const void *buf, size_t count)
 {
-	printf("syscall_write called \n");
 	std::array<int, 2> fd_to_pid = {fd, pid};
 	auto socket_iter = fd_to_socket.find(fd_to_pid);
 	if(socket_iter == fd_to_socket.end())
@@ -1398,21 +1398,15 @@ void TCPAssignment::syscall_write(UUID syscallUUID, int pid, int fd, const void 
 	{
 		size_t write_count = wb_write(&socket->wb, buf, count);
 
-		printf("count, write_count is %d %d \n", (int)count, (int)write_count);
-
 		this->returnSystemCall(syscallUUID, write_count);
 
 		if(socket->rwnd >= socket->wmgr.size)
 		{
-			printf("enough rwnd\n");
 			uint32_t seg_len;
-			printf("wb.size is %d, wmgr.size is %d \n", socket->wb.size, socket->wmgr.size);
-
 			while(socket->wb.size - socket->wmgr.size > 0)
 			{
 				seg_len = socket->wb.size - socket->wmgr.size >= MSS ? MSS : socket->wb.size - socket->wmgr.size;
 
-				printf("seg_len is %d \n", (int)seg_len);
 				struct write_info wi;
 				wi.start = socket->wb.end;
 				wi.end = (wi.start + seg_len) % (BUF_SIZE + 1);
@@ -1424,7 +1418,7 @@ void TCPAssignment::syscall_write(UUID syscallUUID, int pid, int fd, const void 
 
 				uint16_t packet_totallen = htons(wi.size);
 				uint32_t packet_seq_num = htonl(socket->seq_num);
-				uint32_t packet_ack_num = htonl(0x00000000);
+				uint32_t packet_ack_num = htonl(socket->ack_num);
 				uint8_t packet_headerlen = (uint8_t) 0x50;
 				uint8_t packet_flags = (uint8_t) ACK;
 				uint16_t packet_rwnd = (uint16_t) htons(BUF_SIZE - socket->rb.size);
@@ -1456,8 +1450,6 @@ void TCPAssignment::syscall_write(UUID syscallUUID, int pid, int fd, const void 
 				wr_pkt->writeData(14 + 20 + 16, &packet_checksum, 2);
 
 				this->sendPacket("IPv4", wr_pkt);
-
-				printf("sent packet \n");
 
 				if(socket->wmgr.write_infos.empty())
 				{

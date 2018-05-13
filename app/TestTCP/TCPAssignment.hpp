@@ -24,7 +24,7 @@ namespace E
 {
 
 	#define BUF_SIZE 51200
-	#define MSS 1460
+	#define MSS 512
 
 	enum Bound_State {UNBOUND, BOUND};
 	enum Connection_State {UNCONNECTED, CONNECTED};

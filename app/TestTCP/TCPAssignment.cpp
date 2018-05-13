@@ -296,7 +296,6 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 							struct sock_info s_socket;
 							static struct read_buffer empty_rb;
 							static struct write_buffer empty_wb;
-							static struct read_buffer empty_rb;
 							static struct write_manager empty_wmgr;
 							s_socket.uuid = 0;
 							s_socket.pid = rcv_socket->pid;
@@ -322,7 +321,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 							s_socket.write_buf = NULL;
 							s_socket.write_count = 0;
 							s_socket.smallest_unacked = s_socket.seq_num;
-							s_socket.rwnd = 0;
+							s_socket.rwnd = BUF_SIZE;
 							s_socket.dup_ack_count = 0;
 							s_socket.retransmit_timer = NULL;
 
@@ -597,7 +596,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 					{
 						uint8_t payload[MSS];
 						packet->readData(14 + 20 + 20, payload, payload_len);
-						rb_write(rcv_socket->rb, payload, payload_len);
+						rb_write(&rcv_socket->rb, payload, payload_len);
 
 						rcv_socket->rb.cont_size += payload_len;
 						rcv_socket->rb.cont_end = rcv_socket->rb.start + rcv_socket->rb.cont_size;
@@ -668,7 +667,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 								struct write_info *wi = &*wi_iter;
 
 								uint8_t payload[MSS];
-								size_t read_count = wb_read(rcv_socket->wb, payload, wi->size);
+								size_t read_count = wb_read(&rcv_socket->wb, payload, wi->size);
 
 								uint16_t packet_totallen = htons(read_count);
 								uint32_t packet_seq_num = htonl(wi->seq_num);
@@ -766,7 +765,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 								wi.seq_num = rcv_socket->seq_num;
 
 								uint8_t payload[MSS];
-								size_t read_count = wb_read(rcv_socket->wb, payload, wi.size);
+								size_t read_count = wb_read(&rcv_socket->wb, payload, wi.size);
 
 								uint16_t packet_totallen = htons(read_count);
 								uint32_t packet_seq_num = htonl(rcv_socket->seq_num);
@@ -1024,7 +1023,7 @@ void TCPAssignment::timerCallback(void *payload)
 			struct write_info *wi = &*wi_iter;
 
 			uint8_t payload[MSS];
-			size_t payload_len = wb_read(socket->wb, payload, wi->size);
+			size_t payload_len = wb_read(&socket->wb, payload, wi->size);
 
 			uint16_t packet_totallen = htons(payload_len);
 			uint32_t packet_seq_num = htonl(wi->seq_num);
@@ -1113,7 +1112,7 @@ void TCPAssignment::syscall_socket(UUID syscallUUID, int pid, int domain, int ty
 	socket.write_buf = NULL;
 	socket.write_count = 0;
 	socket.smallest_unacked = socket.seq_num;
-	socket.rwnd = 0;
+	socket.rwnd = BUF_SIZE;
 	socket.dup_ack_count = 0;
 	socket.retransmit_timer = NULL;
 
@@ -1353,7 +1352,7 @@ void TCPAssignment::syscall_read(UUID syscallUUID, int pid, int fd, void *buf, s
 
 	if(socket->rb.cont_size > 0)
 	{
-		size_t read_count = rb_read(socket->rb, buf, count);
+		size_t read_count = rb_read(&socket->rb, buf, count);
 
 		socket->rb.start = (socket->rb.start + read_count) % (BUF_SIZE + 1);
 		socket->rb.size -= read_count;
@@ -1379,21 +1378,18 @@ void TCPAssignment::syscall_write(UUID syscallUUID, int pid, int fd, const void 
 	auto socket_iter = fd_to_socket.find(fd_to_pid);
 	if(socket_iter == fd_to_socket.end())
 	{
-		printf("error 1\n");
 		this->returnSystemCall(syscallUUID, -1);
 		return;
 	}
 	struct sock_info *socket = &socket_iter->second;
 	if(socket->pid != pid)
 	{
-		printf("error 2\n");
 		this->returnSystemCall(syscallUUID, -1);
 		return;
 	}
 
 	if(socket->connection_state != CONNECTED || socket->close_state != UNCLOSED)
 	{
-		printf("error 3\n");
 		this->returnSystemCall(syscallUUID, -1);
 		return;
 	}
@@ -1424,7 +1420,7 @@ void TCPAssignment::syscall_write(UUID syscallUUID, int pid, int fd, const void 
 				wi.seq_num = socket->seq_num;
 
 				uint8_t payload[MSS];
-				size_t payload_len = wb_read(socket->wb, payload, wi.size);
+				size_t payload_len = wb_read(&socket->wb, payload, wi.size);
 
 				uint16_t packet_totallen = htons(wi.size);
 				uint32_t packet_seq_num = htonl(socket->seq_num);
@@ -1705,7 +1701,7 @@ void TCPAssignment::syscall_accept(UUID syscallUUID, int pid, int sockfd,
 		s_socket.write_buf = NULL;
 		s_socket.write_count = 0;
 		s_socket.smallest_unacked = s_socket.seq_num;
-		s_socket.rwnd = 0;
+		s_socket.rwnd = BUF_SIZE;
 		s_socket.dup_ack_count = 0;
 		s_socket.retransmit_timer = NULL;
 
@@ -1838,64 +1834,64 @@ void TCPAssignment::syscall_getpeername(UUID syscallUUID, int pid, int sockfd,
 	return;
 }
 
-size_t TCPAssignment::rb_read(struct read_buffer rb, void *buf, size_t count)
+size_t TCPAssignment::rb_read(struct read_buffer *rb, void *buf, size_t count)
 {
-	size_t read_count = rb.cont_size >= count ? count : rb.cont_size;
-	if(rb.start + read_count > BUF_SIZE)
+	size_t read_count = rb->cont_size >= count ? count : rb->cont_size;
+	if(rb->start + read_count > BUF_SIZE)
 	{
-		memcpy(buf, rb.buffer + rb.start, BUF_SIZE - rb.start);
-		memcpy((uint8_t *)buf + (BUF_SIZE - rb.start), rb.buffer, read_count - (BUF_SIZE - rb.start));
+		memcpy(buf, rb->buffer + rb->start, BUF_SIZE - rb->start);
+		memcpy((uint8_t *)buf + (BUF_SIZE - rb->start), rb->buffer, read_count - (BUF_SIZE - rb->start));
 	}
 	else
-		memcpy(buf, rb.buffer + rb.start, read_count);
+		memcpy(buf, rb->buffer + rb->start, read_count);
 	return read_count;
 }
 
-size_t TCPAssignment::rb_write(struct read_buffer rb, const void *buf, size_t count)
+size_t TCPAssignment::rb_write(struct read_buffer *rb, const void *buf, size_t count)
 {
-	if(rb.end + count > BUF_SIZE)
+	if(rb->end + count > BUF_SIZE)
 	{
-		memcpy(rb.buffer + rb.end, buf, BUF_SIZE - rb.end);
-		memcpy(rb.buffer, (uint8_t *)buf + (BUF_SIZE - rb.end), count - (BUF_SIZE - rb.end));
-		rb.end = count - (BUF_SIZE - rb.end);
+		memcpy(rb->buffer + rb->end, buf, BUF_SIZE - rb->end);
+		memcpy(rb->buffer, (uint8_t *)buf + (BUF_SIZE - rb->end), count - (BUF_SIZE - rb->end));
+		rb->end = count - (BUF_SIZE - rb->end);
 	}
 	else
 	{
-		memcpy(rb.buffer + rb.end, buf, count);
-		rb.end += count;
+		memcpy(rb->buffer + rb->end, buf, count);
+		rb->end += count;
 	}
-	rb.size += count;
+	rb->size += count;
 	return count;
 }
 
-size_t TCPAssignment::rb_pos_write(struct read_buffer rb, size_t pos, const void *buf, size_t count)
+size_t TCPAssignment::rb_pos_write(struct read_buffer *rb, size_t pos, const void *buf, size_t count)
 {
-	if(rb.cont_end + pos + count > BUF_SIZE)
+	if(rb->cont_end + pos + count > BUF_SIZE)
 	{
-		memcpy(rb.buffer + rb.cont_end + pos, buf, BUF_SIZE - (rb.cont_end + pos));
-		memcpy(rb.buffer, (uint8_t *)buf + (BUF_SIZE - (rb.cont_end + pos)), count - (BUF_SIZE - (rb.cont_end + pos)));
-		rb.end = rb.end >= count - (BUF_SIZE - (rb.cont_end + pos)) ? rb.end : count - (BUF_SIZE - (rb.cont_end + pos));
-		rb.size = rb.end + BUF_SIZE - rb.start;
+		memcpy(rb->buffer + rb->cont_end + pos, buf, BUF_SIZE - (rb->cont_end + pos));
+		memcpy(rb->buffer, (uint8_t *)buf + (BUF_SIZE - (rb->cont_end + pos)), count - (BUF_SIZE - (rb->cont_end + pos)));
+		rb->end = rb->end >= count - (BUF_SIZE - (rb->cont_end + pos)) ? rb->end : count - (BUF_SIZE - (rb->cont_end + pos));
+		rb->size = rb->end + BUF_SIZE - rb->start;
 	}
 	else
 	{
-		memcpy(rb.buffer + rb.cont_end + pos, buf, count);
-		rb.end = rb.end >= rb.cont_end + pos + count ? rb.end : rb.cont_end + pos + count;
-		rb.size = rb.end - rb.start;
+		memcpy(rb->buffer + rb->cont_end + pos, buf, count);
+		rb->end = rb->end >= rb->cont_end + pos + count ? rb->end : rb->cont_end + pos + count;
+		rb->size = rb->end - rb->start;
 	}
 	return count;
 }
 
-size_t TCPAssignment::wb_read(struct write_buffer wb, void *buf, size_t count)
+size_t TCPAssignment::wb_read(struct write_buffer *wb, void *buf, size_t count)
 {
-	size_t read_count = wb.size >= count ? count : wb.size;
-	if(wb.start + read_count > BUF_SIZE)
+	size_t read_count = wb->size >= count ? count : wb->size;
+	if(wb->start + read_count > BUF_SIZE)
 	{
-		memcpy(buf, wb.buffer + wb.start, BUF_SIZE - wb.start);
-		memcpy((uint8_t *)buf + (BUF_SIZE - wb.start), wb.buffer, read_count - (BUF_SIZE - wb.start));
+		memcpy(buf, wb->buffer + wb->start, BUF_SIZE - wb->start);
+		memcpy((uint8_t *)buf + (BUF_SIZE - wb->start), wb->buffer, read_count - (BUF_SIZE - wb->start));
 	}
 	else
-		memcpy(buf, wb.buffer + wb.start, read_count);
+		memcpy(buf, wb->buffer + wb->start, read_count);
 	return read_count;
 }
 
@@ -1914,8 +1910,6 @@ size_t TCPAssignment::wb_write(struct write_buffer *wb, const void *buf, size_t 
 		wb->end += count;
 	}
 	wb->size += count;
-
-	printf("wb.size is %d \n", wb->size);
 	return count;
 }
 

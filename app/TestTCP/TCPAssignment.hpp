@@ -175,10 +175,10 @@ protected:
 	virtual void systemCallback(UUID syscallUUID, int pid, const SystemCallParameter& param) final;
 	virtual void packetArrived(std::string fromModule, Packet* packet) final;
 
-	size_t rb_read(struct read_buffer rb, void *buf, size_t count);
-	size_t rb_write(struct read_buffer rb, const void *buf, size_t count);
-	size_t rb_pos_write(struct read_buffer rb, size_t pos, const void *buf, size_t count);
-	size_t wb_read(struct write_buffer wb, void *buf, size_t count);
+	size_t rb_read(struct read_buffer *rb, void *buf, size_t count);
+	size_t rb_write(struct read_buffer *rb, const void *buf, size_t count);
+	size_t rb_pos_write(struct read_buffer *rb, size_t pos, const void *buf, size_t count);
+	size_t wb_read(struct write_buffer *wb, void *buf, size_t count);
 	size_t wb_write(struct write_buffer *wb, const void *buf, size_t count);
 };
 

@@ -249,6 +249,9 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 				reply_pkt->writeData(14 + 20 + 16, &packet_checksum, 2);
 
 				this->sendPacket("IPv4", reply_pkt);
+
+				struct connection *connection_temp = &*(--rcv_socket->connections.end());
+				connection_temp->seq_num += 1;
 			}
 			else if(flags == ACK)
 			{

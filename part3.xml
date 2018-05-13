@@ -1,335 +1,129 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites tests="12" failures="12" disabled="0" errors="0" timestamp="2018-05-13T05:23:58" time="1.45" name="AllTests">
-  <testsuite name="TestEnv_Any" tests="12" failures="12" disabled="0" errors="0" time="1.45">
-    <testcase name="TestTransfer_Connect_Send_Symmetric" status="run" time="0.008" classname="TestEnv_Any">
-      <failure message="testtransfer.cpp:156&#x0A;Expected equality of these values:&#x0A;  expect_size&#x0A;    Which is: 131072&#x0A;  total_size&#x0A;    Which is: 0" type=""><![CDATA[testtransfer.cpp:156
-Expected equality of these values:
-  expect_size
-    Which is: 131072
-  total_size
-    Which is: 0]]></failure>
+<testsuites tests="12" failures="12" disabled="0" errors="0" timestamp="2018-05-13T13:13:44" time="1.076" name="AllTests">
+  <testsuite name="TestEnv_Any" tests="12" failures="12" disabled="0" errors="0" time="1.076">
+    <testcase name="TestTransfer_Connect_Send_Symmetric" status="run" time="0.009" classname="TestEnv_Any">
+      <failure message="testtransfer.cpp:156&#x0A;Value of: total_size&#x0A;  Actual: 0&#x0A;Expected: expect_size&#x0A;Which is: 131072" type=""><![CDATA[testtransfer.cpp:156
+Value of: total_size
+  Actual: 0
+Expected: expect_size
+Which is: 131072]]></failure>
     </testcase>
-    <testcase name="TestTransfer_Connect_Send_EOF" status="run" time="0.007" classname="TestEnv_Any">
-      <failure message="testtransfer.cpp:156&#x0A;Expected equality of these values:&#x0A;  expect_size&#x0A;    Which is: 131072&#x0A;  total_size&#x0A;    Which is: 0" type=""><![CDATA[testtransfer.cpp:156
-Expected equality of these values:
-  expect_size
-    Which is: 131072
-  total_size
-    Which is: 0]]></failure>
+    <testcase name="TestTransfer_Connect_Send_EOF" status="run" time="0.008" classname="TestEnv_Any">
+      <failure message="testtransfer.cpp:156&#x0A;Value of: total_size&#x0A;  Actual: 0&#x0A;Expected: expect_size&#x0A;Which is: 131072" type=""><![CDATA[testtransfer.cpp:156
+Value of: total_size
+  Actual: 0
+Expected: expect_size
+Which is: 131072]]></failure>
     </testcase>
-    <testcase name="TestTransfer_Connect_Recv_Symmetric" status="run" time="0.175" classname="TestEnv_Any">
-      <failure message="testtransfer.cpp:273&#x0A;Expected equality of these values:&#x0A;  expect_size&#x0A;    Which is: 131072&#x0A;  total_size&#x0A;    Which is: 0" type=""><![CDATA[testtransfer.cpp:273
-Expected equality of these values:
-  expect_size
-    Which is: 131072
-  total_size
-    Which is: 0]]></failure>
-      <failure message="testtransfer.cpp:156&#x0A;Expected equality of these values:&#x0A;  expect_size&#x0A;    Which is: 131072&#x0A;  total_size&#x0A;    Which is: 0" type=""><![CDATA[testtransfer.cpp:156
-Expected equality of these values:
-  expect_size
-    Which is: 131072
-  total_size
-    Which is: 0]]></failure>
+    <testcase name="TestTransfer_Connect_Recv_Symmetric" status="run" time="0.203" classname="TestEnv_Any">
+      <failure message="testtransfer.cpp:273&#x0A;Value of: total_size&#x0A;  Actual: 0&#x0A;Expected: expect_size&#x0A;Which is: 131072" type=""><![CDATA[testtransfer.cpp:273
+Value of: total_size
+  Actual: 0
+Expected: expect_size
+Which is: 131072]]></failure>
+      <failure message="testtransfer.cpp:156&#x0A;Value of: total_size&#x0A;  Actual: 0&#x0A;Expected: expect_size&#x0A;Which is: 131072" type=""><![CDATA[testtransfer.cpp:156
+Value of: total_size
+  Actual: 0
+Expected: expect_size
+Which is: 131072]]></failure>
     </testcase>
-    <testcase name="TestTransfer_Connect_Recv_EOF" status="run" time="0.16" classname="TestEnv_Any">
-      <failure message="testtransfer.cpp:273&#x0A;Expected equality of these values:&#x0A;  expect_size&#x0A;    Which is: 131072&#x0A;  total_size&#x0A;    Which is: 0" type=""><![CDATA[testtransfer.cpp:273
-Expected equality of these values:
-  expect_size
-    Which is: 131072
-  total_size
-    Which is: 0]]></failure>
-      <failure message="testtransfer.cpp:156&#x0A;Expected equality of these values:&#x0A;  expect_size&#x0A;    Which is: 131072&#x0A;  total_size&#x0A;    Which is: 0" type=""><![CDATA[testtransfer.cpp:156
-Expected equality of these values:
-  expect_size
-    Which is: 131072
-  total_size
-    Which is: 0]]></failure>
+    <testcase name="TestTransfer_Connect_Recv_EOF" status="run" time="0.127" classname="TestEnv_Any">
+      <failure message="testtransfer.cpp:273&#x0A;Value of: total_size&#x0A;  Actual: 0&#x0A;Expected: expect_size&#x0A;Which is: 131072" type=""><![CDATA[testtransfer.cpp:273
+Value of: total_size
+  Actual: 0
+Expected: expect_size
+Which is: 131072]]></failure>
+      <failure message="testtransfer.cpp:156&#x0A;Value of: total_size&#x0A;  Actual: 0&#x0A;Expected: expect_size&#x0A;Which is: 131072" type=""><![CDATA[testtransfer.cpp:156
+Value of: total_size
+  Actual: 0
+Expected: expect_size
+Which is: 131072]]></failure>
     </testcase>
-    <testcase name="TestTransfer_Connect_Recv_SmallBuffer1" status="run" time="0.161" classname="TestEnv_Any">
-      <failure message="testtransfer.cpp:273&#x0A;Expected equality of these values:&#x0A;  expect_size&#x0A;    Which is: 131072&#x0A;  total_size&#x0A;    Which is: 0" type=""><![CDATA[testtransfer.cpp:273
-Expected equality of these values:
-  expect_size
-    Which is: 131072
-  total_size
-    Which is: 0]]></failure>
-      <failure message="testtransfer.cpp:156&#x0A;Expected equality of these values:&#x0A;  expect_size&#x0A;    Which is: 131072&#x0A;  total_size&#x0A;    Which is: 0" type=""><![CDATA[testtransfer.cpp:156
-Expected equality of these values:
-  expect_size
-    Which is: 131072
-  total_size
-    Which is: 0]]></failure>
+    <testcase name="TestTransfer_Connect_Recv_SmallBuffer1" status="run" time="0.121" classname="TestEnv_Any">
+      <failure message="testtransfer.cpp:273&#x0A;Value of: total_size&#x0A;  Actual: 0&#x0A;Expected: expect_size&#x0A;Which is: 131072" type=""><![CDATA[testtransfer.cpp:273
+Value of: total_size
+  Actual: 0
+Expected: expect_size
+Which is: 131072]]></failure>
+      <failure message="testtransfer.cpp:156&#x0A;Value of: total_size&#x0A;  Actual: 0&#x0A;Expected: expect_size&#x0A;Which is: 131072" type=""><![CDATA[testtransfer.cpp:156
+Value of: total_size
+  Actual: 0
+Expected: expect_size
+Which is: 131072]]></failure>
     </testcase>
-    <testcase name="TestTransfer_Connect_Recv_SmallBuffer2" status="run" time="0.146" classname="TestEnv_Any">
-      <failure message="testtransfer.cpp:273&#x0A;Expected equality of these values:&#x0A;  expect_size&#x0A;    Which is: 64819&#x0A;  total_size&#x0A;    Which is: 0" type=""><![CDATA[testtransfer.cpp:273
-Expected equality of these values:
-  expect_size
-    Which is: 64819
-  total_size
-    Which is: 0]]></failure>
-      <failure message="testtransfer.cpp:156&#x0A;Expected equality of these values:&#x0A;  expect_size&#x0A;    Which is: 64819&#x0A;  total_size&#x0A;    Which is: 53" type=""><![CDATA[testtransfer.cpp:156
-Expected equality of these values:
-  expect_size
-    Which is: 64819
-  total_size
-    Which is: 53]]></failure>
+    <testcase name="TestTransfer_Connect_Recv_SmallBuffer2" status="run" time="0.118" classname="TestEnv_Any">
+      <failure message="testtransfer.cpp:273&#x0A;Value of: total_size&#x0A;  Actual: 0&#x0A;Expected: expect_size&#x0A;Which is: 64819" type=""><![CDATA[testtransfer.cpp:273
+Value of: total_size
+  Actual: 0
+Expected: expect_size
+Which is: 64819]]></failure>
+      <failure message="testtransfer.cpp:156&#x0A;Value of: total_size&#x0A;  Actual: 53&#x0A;Expected: expect_size&#x0A;Which is: 64819" type=""><![CDATA[testtransfer.cpp:156
+Value of: total_size
+  Actual: 53
+Expected: expect_size
+Which is: 64819]]></failure>
     </testcase>
-    <testcase name="TestTransfer_Accept_Send_Symmetric" status="run" time="0.003" classname="TestEnv_Any">
-      <failure message="testtransfer.cpp:68&#x0A;Expected: (client_fd) &gt;= (0), actual: -1 vs 0" type=""><![CDATA[testtransfer.cpp:68
-Expected: (client_fd) >= (0), actual: -1 vs 0]]></failure>
-      <failure message="testtransfer.cpp:71&#x0A;Expected equality of these values:&#x0A;  client_addr.sin_family&#x0A;    Which is: &apos;\0&apos;&#x0A;  2" type=""><![CDATA[testtransfer.cpp:71
-Expected equality of these values:
-  client_addr.sin_family
-    Which is: '\0'
-  2]]></failure>
-      <failure message="testtransfer.cpp:76&#x0A;Expected equality of these values:&#x0A;  ret&#x0A;    Which is: -1&#x0A;  0" type=""><![CDATA[testtransfer.cpp:76
-Expected equality of these values:
-  ret
-    Which is: -1
-  0]]></failure>
-      <failure message="testtransfer.cpp:79&#x0A;Expected equality of these values:&#x0A;  addr.sin_family&#x0A;    Which is: &apos;\x2&apos; (2)&#x0A;  temp_addr.sin_family&#x0A;    Which is: &apos;@&apos; (64, 0x40)" type=""><![CDATA[testtransfer.cpp:79
-Expected equality of these values:
-  addr.sin_family
-    Which is: '\x2' (2)
-  temp_addr.sin_family
-    Which is: '@' (64, 0x40)]]></failure>
-      <failure message="testtransfer.cpp:80&#x0A;Expected equality of these values:&#x0A;  addr.sin_port&#x0A;    Which is: 3879&#x0A;  temp_addr.sin_port&#x0A;    Which is: 79" type=""><![CDATA[testtransfer.cpp:80
-Expected equality of these values:
-  addr.sin_port
-    Which is: 3879
-  temp_addr.sin_port
-    Which is: 79]]></failure>
-      <failure message="testtransfer.cpp:86&#x0A;Expected equality of these values:&#x0A;  ret&#x0A;    Which is: -1&#x0A;  0" type=""><![CDATA[testtransfer.cpp:86
-Expected equality of these values:
-  ret
-    Which is: -1
-  0]]></failure>
-      <failure message="testtransfer.cpp:156&#x0A;Expected equality of these values:&#x0A;  expect_size&#x0A;    Which is: 131072&#x0A;  total_size&#x0A;    Which is: 0" type=""><![CDATA[testtransfer.cpp:156
-Expected equality of these values:
-  expect_size
-    Which is: 131072
-  total_size
-    Which is: 0]]></failure>
-      <failure message="testtransfer.cpp:273&#x0A;Expected equality of these values:&#x0A;  expect_size&#x0A;    Which is: 131072&#x0A;  total_size&#x0A;    Which is: 0" type=""><![CDATA[testtransfer.cpp:273
-Expected equality of these values:
-  expect_size
-    Which is: 131072
-  total_size
-    Which is: 0]]></failure>
+    <testcase name="TestTransfer_Accept_Send_Symmetric" status="run" time="0.006" classname="TestEnv_Any">
+      <failure message="testtransfer.cpp:273&#x0A;Value of: total_size&#x0A;  Actual: 0&#x0A;Expected: expect_size&#x0A;Which is: 131072" type=""><![CDATA[testtransfer.cpp:273
+Value of: total_size
+  Actual: 0
+Expected: expect_size
+Which is: 131072]]></failure>
     </testcase>
-    <testcase name="TestTransfer_Accept_Send_EOF" status="run" time="0.002" classname="TestEnv_Any">
-      <failure message="testtransfer.cpp:68&#x0A;Expected: (client_fd) &gt;= (0), actual: -1 vs 0" type=""><![CDATA[testtransfer.cpp:68
-Expected: (client_fd) >= (0), actual: -1 vs 0]]></failure>
-      <failure message="testtransfer.cpp:71&#x0A;Expected equality of these values:&#x0A;  client_addr.sin_family&#x0A;    Which is: &apos;\0&apos;&#x0A;  2" type=""><![CDATA[testtransfer.cpp:71
-Expected equality of these values:
-  client_addr.sin_family
-    Which is: '\0'
-  2]]></failure>
-      <failure message="testtransfer.cpp:76&#x0A;Expected equality of these values:&#x0A;  ret&#x0A;    Which is: -1&#x0A;  0" type=""><![CDATA[testtransfer.cpp:76
-Expected equality of these values:
-  ret
-    Which is: -1
-  0]]></failure>
-      <failure message="testtransfer.cpp:79&#x0A;Expected equality of these values:&#x0A;  addr.sin_family&#x0A;    Which is: &apos;\x2&apos; (2)&#x0A;  temp_addr.sin_family&#x0A;    Which is: &apos;p&apos; (112, 0x70)" type=""><![CDATA[testtransfer.cpp:79
-Expected equality of these values:
-  addr.sin_family
-    Which is: '\x2' (2)
-  temp_addr.sin_family
-    Which is: 'p' (112, 0x70)]]></failure>
-      <failure message="testtransfer.cpp:80&#x0A;Expected equality of these values:&#x0A;  addr.sin_port&#x0A;    Which is: 3879&#x0A;  temp_addr.sin_port&#x0A;    Which is: 87" type=""><![CDATA[testtransfer.cpp:80
-Expected equality of these values:
-  addr.sin_port
-    Which is: 3879
-  temp_addr.sin_port
-    Which is: 87]]></failure>
-      <failure message="testtransfer.cpp:86&#x0A;Expected equality of these values:&#x0A;  ret&#x0A;    Which is: -1&#x0A;  0" type=""><![CDATA[testtransfer.cpp:86
-Expected equality of these values:
-  ret
-    Which is: -1
-  0]]></failure>
-      <failure message="testtransfer.cpp:156&#x0A;Expected equality of these values:&#x0A;  expect_size&#x0A;    Which is: 131072&#x0A;  total_size&#x0A;    Which is: 0" type=""><![CDATA[testtransfer.cpp:156
-Expected equality of these values:
-  expect_size
-    Which is: 131072
-  total_size
-    Which is: 0]]></failure>
-      <failure message="testtransfer.cpp:273&#x0A;Expected equality of these values:&#x0A;  expect_size&#x0A;    Which is: 131072&#x0A;  total_size&#x0A;    Which is: 0" type=""><![CDATA[testtransfer.cpp:273
-Expected equality of these values:
-  expect_size
-    Which is: 131072
-  total_size
-    Which is: 0]]></failure>
+    <testcase name="TestTransfer_Accept_Send_EOF" status="run" time="0.005" classname="TestEnv_Any">
+      <failure message="testtransfer.cpp:273&#x0A;Value of: total_size&#x0A;  Actual: 0&#x0A;Expected: expect_size&#x0A;Which is: 131072" type=""><![CDATA[testtransfer.cpp:273
+Value of: total_size
+  Actual: 0
+Expected: expect_size
+Which is: 131072]]></failure>
     </testcase>
-    <testcase name="TestTransfer_Accept_Recv_Symmetric" status="run" time="0.182" classname="TestEnv_Any">
-      <failure message="testtransfer.cpp:68&#x0A;Expected: (client_fd) &gt;= (0), actual: -1 vs 0" type=""><![CDATA[testtransfer.cpp:68
-Expected: (client_fd) >= (0), actual: -1 vs 0]]></failure>
-      <failure message="testtransfer.cpp:71&#x0A;Expected equality of these values:&#x0A;  client_addr.sin_family&#x0A;    Which is: &apos;\0&apos;&#x0A;  2" type=""><![CDATA[testtransfer.cpp:71
-Expected equality of these values:
-  client_addr.sin_family
-    Which is: '\0'
-  2]]></failure>
-      <failure message="testtransfer.cpp:76&#x0A;Expected equality of these values:&#x0A;  ret&#x0A;    Which is: -1&#x0A;  0" type=""><![CDATA[testtransfer.cpp:76
-Expected equality of these values:
-  ret
-    Which is: -1
-  0]]></failure>
-      <failure message="testtransfer.cpp:79&#x0A;Expected equality of these values:&#x0A;  addr.sin_family&#x0A;    Which is: &apos;\x2&apos; (2)&#x0A;  temp_addr.sin_family&#x0A;    Which is: &apos;@&apos; (64, 0x40)" type=""><![CDATA[testtransfer.cpp:79
-Expected equality of these values:
-  addr.sin_family
-    Which is: '\x2' (2)
-  temp_addr.sin_family
-    Which is: '@' (64, 0x40)]]></failure>
-      <failure message="testtransfer.cpp:80&#x0A;Expected equality of these values:&#x0A;  addr.sin_port&#x0A;    Which is: 3879&#x0A;  temp_addr.sin_port&#x0A;    Which is: 79" type=""><![CDATA[testtransfer.cpp:80
-Expected equality of these values:
-  addr.sin_port
-    Which is: 3879
-  temp_addr.sin_port
-    Which is: 79]]></failure>
-      <failure message="testtransfer.cpp:86&#x0A;Expected equality of these values:&#x0A;  ret&#x0A;    Which is: -1&#x0A;  0" type=""><![CDATA[testtransfer.cpp:86
-Expected equality of these values:
-  ret
-    Which is: -1
-  0]]></failure>
-      <failure message="testtransfer.cpp:156&#x0A;Expected equality of these values:&#x0A;  expect_size&#x0A;    Which is: 131072&#x0A;  total_size&#x0A;    Which is: 0" type=""><![CDATA[testtransfer.cpp:156
-Expected equality of these values:
-  expect_size
-    Which is: 131072
-  total_size
-    Which is: 0]]></failure>
-      <failure message="testtransfer.cpp:273&#x0A;Expected equality of these values:&#x0A;  expect_size&#x0A;    Which is: 131072&#x0A;  total_size&#x0A;    Which is: 0" type=""><![CDATA[testtransfer.cpp:273
-Expected equality of these values:
-  expect_size
-    Which is: 131072
-  total_size
-    Which is: 0]]></failure>
+    <testcase name="TestTransfer_Accept_Recv_Symmetric" status="run" time="0.123" classname="TestEnv_Any">
+      <failure message="testtransfer.cpp:156&#x0A;Value of: total_size&#x0A;  Actual: 0&#x0A;Expected: expect_size&#x0A;Which is: 131072" type=""><![CDATA[testtransfer.cpp:156
+Value of: total_size
+  Actual: 0
+Expected: expect_size
+Which is: 131072]]></failure>
+      <failure message="testtransfer.cpp:273&#x0A;Value of: total_size&#x0A;  Actual: 0&#x0A;Expected: expect_size&#x0A;Which is: 131072" type=""><![CDATA[testtransfer.cpp:273
+Value of: total_size
+  Actual: 0
+Expected: expect_size
+Which is: 131072]]></failure>
     </testcase>
-    <testcase name="TestTransfer_Accept_Recv_EOF" status="run" time="0.211" classname="TestEnv_Any">
-      <failure message="testtransfer.cpp:68&#x0A;Expected: (client_fd) &gt;= (0), actual: -1 vs 0" type=""><![CDATA[testtransfer.cpp:68
-Expected: (client_fd) >= (0), actual: -1 vs 0]]></failure>
-      <failure message="testtransfer.cpp:71&#x0A;Expected equality of these values:&#x0A;  client_addr.sin_family&#x0A;    Which is: &apos;\0&apos;&#x0A;  2" type=""><![CDATA[testtransfer.cpp:71
-Expected equality of these values:
-  client_addr.sin_family
-    Which is: '\0'
-  2]]></failure>
-      <failure message="testtransfer.cpp:76&#x0A;Expected equality of these values:&#x0A;  ret&#x0A;    Which is: -1&#x0A;  0" type=""><![CDATA[testtransfer.cpp:76
-Expected equality of these values:
-  ret
-    Which is: -1
-  0]]></failure>
-      <failure message="testtransfer.cpp:79&#x0A;Expected equality of these values:&#x0A;  addr.sin_family&#x0A;    Which is: &apos;\x2&apos; (2)&#x0A;  temp_addr.sin_family&#x0A;    Which is: &apos;@&apos; (64, 0x40)" type=""><![CDATA[testtransfer.cpp:79
-Expected equality of these values:
-  addr.sin_family
-    Which is: '\x2' (2)
-  temp_addr.sin_family
-    Which is: '@' (64, 0x40)]]></failure>
-      <failure message="testtransfer.cpp:80&#x0A;Expected equality of these values:&#x0A;  addr.sin_port&#x0A;    Which is: 3879&#x0A;  temp_addr.sin_port&#x0A;    Which is: 79" type=""><![CDATA[testtransfer.cpp:80
-Expected equality of these values:
-  addr.sin_port
-    Which is: 3879
-  temp_addr.sin_port
-    Which is: 79]]></failure>
-      <failure message="testtransfer.cpp:86&#x0A;Expected equality of these values:&#x0A;  ret&#x0A;    Which is: -1&#x0A;  0" type=""><![CDATA[testtransfer.cpp:86
-Expected equality of these values:
-  ret
-    Which is: -1
-  0]]></failure>
-      <failure message="testtransfer.cpp:156&#x0A;Expected equality of these values:&#x0A;  expect_size&#x0A;    Which is: 131072&#x0A;  total_size&#x0A;    Which is: 0" type=""><![CDATA[testtransfer.cpp:156
-Expected equality of these values:
-  expect_size
-    Which is: 131072
-  total_size
-    Which is: 0]]></failure>
-      <failure message="testtransfer.cpp:273&#x0A;Expected equality of these values:&#x0A;  expect_size&#x0A;    Which is: 131072&#x0A;  total_size&#x0A;    Which is: 0" type=""><![CDATA[testtransfer.cpp:273
-Expected equality of these values:
-  expect_size
-    Which is: 131072
-  total_size
-    Which is: 0]]></failure>
+    <testcase name="TestTransfer_Accept_Recv_EOF" status="run" time="0.122" classname="TestEnv_Any">
+      <failure message="testtransfer.cpp:156&#x0A;Value of: total_size&#x0A;  Actual: 0&#x0A;Expected: expect_size&#x0A;Which is: 131072" type=""><![CDATA[testtransfer.cpp:156
+Value of: total_size
+  Actual: 0
+Expected: expect_size
+Which is: 131072]]></failure>
+      <failure message="testtransfer.cpp:273&#x0A;Value of: total_size&#x0A;  Actual: 0&#x0A;Expected: expect_size&#x0A;Which is: 131072" type=""><![CDATA[testtransfer.cpp:273
+Value of: total_size
+  Actual: 0
+Expected: expect_size
+Which is: 131072]]></failure>
     </testcase>
-    <testcase name="TestTransfer_Accept_Recv_SmallBuffer1" status="run" time="0.218" classname="TestEnv_Any">
-      <failure message="testtransfer.cpp:68&#x0A;Expected: (client_fd) &gt;= (0), actual: -1 vs 0" type=""><![CDATA[testtransfer.cpp:68
-Expected: (client_fd) >= (0), actual: -1 vs 0]]></failure>
-      <failure message="testtransfer.cpp:71&#x0A;Expected equality of these values:&#x0A;  client_addr.sin_family&#x0A;    Which is: &apos;\0&apos;&#x0A;  2" type=""><![CDATA[testtransfer.cpp:71
-Expected equality of these values:
-  client_addr.sin_family
-    Which is: '\0'
-  2]]></failure>
-      <failure message="testtransfer.cpp:76&#x0A;Expected equality of these values:&#x0A;  ret&#x0A;    Which is: -1&#x0A;  0" type=""><![CDATA[testtransfer.cpp:76
-Expected equality of these values:
-  ret
-    Which is: -1
-  0]]></failure>
-      <failure message="testtransfer.cpp:79&#x0A;Expected equality of these values:&#x0A;  addr.sin_family&#x0A;    Which is: &apos;\x2&apos; (2)&#x0A;  temp_addr.sin_family&#x0A;    Which is: &apos;@&apos; (64, 0x40)" type=""><![CDATA[testtransfer.cpp:79
-Expected equality of these values:
-  addr.sin_family
-    Which is: '\x2' (2)
-  temp_addr.sin_family
-    Which is: '@' (64, 0x40)]]></failure>
-      <failure message="testtransfer.cpp:80&#x0A;Expected equality of these values:&#x0A;  addr.sin_port&#x0A;    Which is: 3879&#x0A;  temp_addr.sin_port&#x0A;    Which is: 79" type=""><![CDATA[testtransfer.cpp:80
-Expected equality of these values:
-  addr.sin_port
-    Which is: 3879
-  temp_addr.sin_port
-    Which is: 79]]></failure>
-      <failure message="testtransfer.cpp:86&#x0A;Expected equality of these values:&#x0A;  ret&#x0A;    Which is: -1&#x0A;  0" type=""><![CDATA[testtransfer.cpp:86
-Expected equality of these values:
-  ret
-    Which is: -1
-  0]]></failure>
-      <failure message="testtransfer.cpp:156&#x0A;Expected equality of these values:&#x0A;  expect_size&#x0A;    Which is: 131072&#x0A;  total_size&#x0A;    Which is: 0" type=""><![CDATA[testtransfer.cpp:156
-Expected equality of these values:
-  expect_size
-    Which is: 131072
-  total_size
-    Which is: 0]]></failure>
-      <failure message="testtransfer.cpp:273&#x0A;Expected equality of these values:&#x0A;  expect_size&#x0A;    Which is: 131072&#x0A;  total_size&#x0A;    Which is: 0" type=""><![CDATA[testtransfer.cpp:273
-Expected equality of these values:
-  expect_size
-    Which is: 131072
-  total_size
-    Which is: 0]]></failure>
+    <testcase name="TestTransfer_Accept_Recv_SmallBuffer1" status="run" time="0.119" classname="TestEnv_Any">
+      <failure message="testtransfer.cpp:156&#x0A;Value of: total_size&#x0A;  Actual: 0&#x0A;Expected: expect_size&#x0A;Which is: 131072" type=""><![CDATA[testtransfer.cpp:156
+Value of: total_size
+  Actual: 0
+Expected: expect_size
+Which is: 131072]]></failure>
+      <failure message="testtransfer.cpp:273&#x0A;Value of: total_size&#x0A;  Actual: 0&#x0A;Expected: expect_size&#x0A;Which is: 131072" type=""><![CDATA[testtransfer.cpp:273
+Value of: total_size
+  Actual: 0
+Expected: expect_size
+Which is: 131072]]></failure>
     </testcase>
-    <testcase name="TestTransfer_Accept_Recv_SmallBuffer2" status="run" time="0.177" classname="TestEnv_Any">
-      <failure message="testtransfer.cpp:68&#x0A;Expected: (client_fd) &gt;= (0), actual: -1 vs 0" type=""><![CDATA[testtransfer.cpp:68
-Expected: (client_fd) >= (0), actual: -1 vs 0]]></failure>
-      <failure message="testtransfer.cpp:71&#x0A;Expected equality of these values:&#x0A;  client_addr.sin_family&#x0A;    Which is: &apos;\0&apos;&#x0A;  2" type=""><![CDATA[testtransfer.cpp:71
-Expected equality of these values:
-  client_addr.sin_family
-    Which is: '\0'
-  2]]></failure>
-      <failure message="testtransfer.cpp:76&#x0A;Expected equality of these values:&#x0A;  ret&#x0A;    Which is: -1&#x0A;  0" type=""><![CDATA[testtransfer.cpp:76
-Expected equality of these values:
-  ret
-    Which is: -1
-  0]]></failure>
-      <failure message="testtransfer.cpp:79&#x0A;Expected equality of these values:&#x0A;  addr.sin_family&#x0A;    Which is: &apos;\x2&apos; (2)&#x0A;  temp_addr.sin_family&#x0A;    Which is: &apos;@&apos; (64, 0x40)" type=""><![CDATA[testtransfer.cpp:79
-Expected equality of these values:
-  addr.sin_family
-    Which is: '\x2' (2)
-  temp_addr.sin_family
-    Which is: '@' (64, 0x40)]]></failure>
-      <failure message="testtransfer.cpp:80&#x0A;Expected equality of these values:&#x0A;  addr.sin_port&#x0A;    Which is: 3879&#x0A;  temp_addr.sin_port&#x0A;    Which is: 79" type=""><![CDATA[testtransfer.cpp:80
-Expected equality of these values:
-  addr.sin_port
-    Which is: 3879
-  temp_addr.sin_port
-    Which is: 79]]></failure>
-      <failure message="testtransfer.cpp:86&#x0A;Expected equality of these values:&#x0A;  ret&#x0A;    Which is: -1&#x0A;  0" type=""><![CDATA[testtransfer.cpp:86
-Expected equality of these values:
-  ret
-    Which is: -1
-  0]]></failure>
-      <failure message="testtransfer.cpp:156&#x0A;Expected equality of these values:&#x0A;  expect_size&#x0A;    Which is: 64819&#x0A;  total_size&#x0A;    Which is: 0" type=""><![CDATA[testtransfer.cpp:156
-Expected equality of these values:
-  expect_size
-    Which is: 64819
-  total_size
-    Which is: 0]]></failure>
-      <failure message="testtransfer.cpp:273&#x0A;Expected equality of these values:&#x0A;  expect_size&#x0A;    Which is: 64819&#x0A;  total_size&#x0A;    Which is: 53" type=""><![CDATA[testtransfer.cpp:273
-Expected equality of these values:
-  expect_size
-    Which is: 64819
-  total_size
-    Which is: 53]]></failure>
+    <testcase name="TestTransfer_Accept_Recv_SmallBuffer2" status="run" time="0.115" classname="TestEnv_Any">
+      <failure message="testtransfer.cpp:156&#x0A;Value of: total_size&#x0A;  Actual: 0&#x0A;Expected: expect_size&#x0A;Which is: 64819" type=""><![CDATA[testtransfer.cpp:156
+Value of: total_size
+  Actual: 0
+Expected: expect_size
+Which is: 64819]]></failure>
+      <failure message="testtransfer.cpp:273&#x0A;Value of: total_size&#x0A;  Actual: 53&#x0A;Expected: expect_size&#x0A;Which is: 64819" type=""><![CDATA[testtransfer.cpp:273
+Value of: total_size
+  Actual: 53
+Expected: expect_size
+Which is: 64819]]></failure>
     </testcase>
   </testsuite>
 </testsuites>

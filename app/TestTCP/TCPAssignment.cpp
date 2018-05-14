@@ -212,11 +212,15 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 					break;
 
 				struct connection connection;
+				static struct read_manager empty_rmgr;
+				static struct read_buffer empty_rb;
 				connection.src_addr = *(sockaddr *)&dst_addr;
 				connection.dst_addr = *(sockaddr *)&src_addr;
 				connection.tcp_state = TCP_SYN_RCVD;
 				connection.seq_num = initial_seq_num++;
 				connection.ack_num = seq_num + 1;
+				connection.rmgr = empty_rmgr;
+				connection.rb = empty_rb;
 				rcv_socket->connections.push_back(connection);
 
 				send_packet(20 + 20, dst_ip, src_ip, dst_port, src_port, connection.seq_num, connection.ack_num, SYNACK, BUF_SIZE - connection.rb.size, NULL);
@@ -1094,6 +1098,8 @@ void TCPAssignment::syscall_close(UUID syscallUUID, int pid, int fd)
 
 			socket->seq_num += 1;
 			socket->tcp_state = TCP_FIN_WAIT_1;
+
+			this->returnSystemCall(syscallUUID, 0);
 			break;
 
 		case TCP_CLOSE_WAIT:
@@ -1101,6 +1107,8 @@ void TCPAssignment::syscall_close(UUID syscallUUID, int pid, int fd)
 
 			socket->seq_num += 1;
 			socket->tcp_state = TCP_LAST_ACK;
+
+			this->returnSystemCall(syscallUUID, 0);
 			break;
 
 		default:

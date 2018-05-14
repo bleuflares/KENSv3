@@ -65,6 +65,7 @@ protected:
 		socklen_t client_len = sizeof(client_addr);
 		memset(&client_addr, 0, client_len);
 		int client_fd = accept(server_socket, (struct sockaddr*)&client_addr, &client_len);
+		printf("clident addr is  %d %d \n", client_addr.sin_addr.s_addr, client_addr.sin_port);
 		EXPECT_GE(client_fd, 0);
 
 		EXPECT_EQ(client_len, sizeof(client_addr));
@@ -186,6 +187,7 @@ protected:
 		addr.sin_port = htons(atoi(env["CONNECT_PORT"].c_str()));
 
 		int ret = connect(client_socket, (struct sockaddr*)&addr, len);
+		printf("addr is  %d %d \n", addr.sin_addr.s_addr, addr.sin_port);
 		EXPECT_GE(ret, 0);
 
 		struct sockaddr_in temp_addr;

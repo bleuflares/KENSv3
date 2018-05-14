@@ -97,6 +97,7 @@ void TCPAssignment::systemCallback(UUID syscallUUID, int pid, const SystemCallPa
 
 void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 {
+	printf("pkt arrived \n");
 	uint16_t total_len;
 	uint16_t payload_len;
 	uint16_t src_port;
@@ -109,13 +110,13 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 	uint16_t urg_ptr;
 
 	uint32_t src_ip, dst_ip;
-	uint8_t tcp_seg[20];
+	uint8_t tcp_segment[packet->getSize() - 34];
 	packet->readData(14 + 12, &src_ip, sizeof(src_ip));
 	packet->readData(14 + 16, &dst_ip, sizeof(dst_ip));
-	packet->readData(14 + 20, tcp_seg, sizeof(tcp_seg));
+	packet->readData(14 + 20, tcp_segment, sizeof(tcp_segment));
 
 
-	if(NetworkUtil::tcp_sum(src_ip, dst_ip, tcp_seg, sizeof(tcp_seg)) != 0xFFFF)
+	if(NetworkUtil::tcp_sum(src_ip, dst_ip, tcp_segment, sizeof(tcp_segment)) != 0xFFFF)
 	{
 		this->freePacket(packet);
 		return;
@@ -192,17 +193,23 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 	}
 	else
 	{
+		printf("not found \n");
 		this->freePacket(packet);
 		return;
 	}
 
 	Packet *reply_pkt;
+	uint16_t packet_totallen;
 	uint32_t packet_seq_num;
 	uint32_t packet_ack_num;
+	uint8_t packet_headerlen;
 	uint8_t packet_flags;
+	uint8_t packet_rwnd;
 	uint16_t packet_checksum;
+	uint16_t packet_pointer;
 	uint32_t source, dest;
-
+	uint8_t tcp_seg[20];
+	
 	switch(rcv_socket->tcp_state)
 	{
 		case TCP_LISTEN:
@@ -295,7 +302,6 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 							}
 
 							struct sock_info s_socket;
-							static struct read_buffer empty_rb;
 							static struct write_buffer empty_wb;
 							static struct write_manager empty_wmgr;
 							s_socket.uuid = 0;
@@ -312,7 +318,8 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 							s_socket.accept_called = false;
 							s_socket.accept_addr = NULL;
 							s_socket.accept_addrlen = NULL;
-							s_socket.rb = empty_rb;
+							s_socket.rmgr = connection->rmgr;
+							s_socket.rb = connection->rb;
 							s_socket.read_called = false;
 							s_socket.read_buf = NULL;
 							s_socket.read_count = 0;
@@ -336,6 +343,98 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 							rcv_socket->accept_addrlen = NULL;
 
 							this->returnSystemCall(rcv_socket->uuid, fd);
+						}
+					}
+					else if(connection->tcp_state == TCP_ESTABLISHED)
+					{
+						if(payload_len > 0)
+						{
+							if(connection->ack_num >= seq_num)
+							{
+								uint8_t payload[MSS];
+								packet->readData(14 + 20 + 20, payload, payload_len);
+								rb_pos_write(&connection->rb, seq_num - connection->ack_num, payload, payload_len);
+
+								struct read_info ri;
+								ri.start = connection->rb.cont_end + seq_num - connection->ack_num;
+								ri.end = ri.start + payload_len;
+								ri.size = payload_len;
+
+								connection->rmgr.read_infos.push_back(ri);
+								connection->rmgr.read_infos.sort(asc_seq);
+								connection->rmgr.start = ri.start >= connection->rmgr.start ? connection->rmgr.start : ri.start;
+								connection->rmgr.end = ri.end <= connection->rmgr.end ? connection->rmgr.end : ri.end;
+								connection->rmgr.size = (connection->rmgr.end - connection->rmgr.start + BUF_SIZE + 1) % (BUF_SIZE + 1);
+
+								while(!connection->rmgr.read_infos.empty())
+								{
+									if(connection->rb.cont_end == (*connection->rmgr.read_infos.begin()).start)
+									{
+										connection->ack_num = (*connection->rmgr.read_infos.begin()).seq_num + (*connection->rmgr.read_infos.begin()).size;
+										connection->rb.cont_end = (*connection->rmgr.read_infos.begin()).end;
+										connection->rb.cont_size += (*connection->rmgr.read_infos.begin()).size;
+										connection->rmgr.start = (*connection->rmgr.read_infos.begin()).start;
+										connection->rmgr.size -= (*connection->rmgr.read_infos.begin()).size;
+										connection->rmgr.read_infos.pop_front();
+									}
+									else
+										break;
+								}
+
+								packet_seq_num = htonl(connection->seq_num);
+								packet_ack_num = htonl(connection->ack_num);
+								packet_flags = (uint8_t) ACK;
+								packet_rwnd = BUF_SIZE - connection->rb.size;
+								packet_checksum = (uint16_t) 0x0000;
+
+								reply_pkt = this->clonePacket(packet);
+								reply_pkt->writeData(14 + 12, &dst_ip, 4);
+								reply_pkt->writeData(14 + 16, &src_ip, 4);
+								reply_pkt->writeData(14 + 20 + 0, &dst_port, 2);
+								reply_pkt->writeData(14 + 20 + 2, &src_port, 2);
+								reply_pkt->writeData(14 + 20 + 4, &packet_seq_num, 4);
+								reply_pkt->writeData(14 + 20 + 8, &packet_ack_num, 4);
+								reply_pkt->writeData(14 + 20 + 13, &packet_flags, 1);
+								reply_pkt->writeData(14 + 20 + 14, &packet_rwnd, 2);
+								reply_pkt->writeData(14 + 20 + 16, &packet_checksum, 2);
+
+								reply_pkt->readData(14 + 12, &source, sizeof(source));
+								reply_pkt->readData(14 + 16, &dest, sizeof(dest));
+								reply_pkt->readData(14 + 20, tcp_seg, sizeof(tcp_seg));
+
+								packet_checksum = htons(0xFFFF - NetworkUtil::tcp_sum(source, dest, tcp_seg, sizeof(tcp_seg)));
+								reply_pkt->writeData(14 + 20 + 16, &packet_checksum, 2);
+
+								this->sendPacket("IPv4", reply_pkt);
+							}
+							else
+							{
+								packet_seq_num = htonl(connection->seq_num);
+								packet_ack_num = htonl(connection->ack_num);
+								packet_flags = (uint8_t) ACK;
+								packet_rwnd = BUF_SIZE - connection->rb.size;
+								packet_checksum = (uint16_t) 0x0000;
+
+								reply_pkt = this->clonePacket(packet);
+								reply_pkt->writeData(14 + 12, &dst_ip, 4);
+								reply_pkt->writeData(14 + 16, &src_ip, 4);
+								reply_pkt->writeData(14 + 20 + 0, &dst_port, 2);
+								reply_pkt->writeData(14 + 20 + 2, &src_port, 2);
+								reply_pkt->writeData(14 + 20 + 4, &packet_seq_num, 4);
+								reply_pkt->writeData(14 + 20 + 8, &packet_ack_num, 4);
+								reply_pkt->writeData(14 + 20 + 13, &packet_flags, 1);
+								reply_pkt->writeData(14 + 20 + 14, &packet_rwnd, 2);
+								reply_pkt->writeData(14 + 20 + 16, &packet_checksum, 2);
+
+								reply_pkt->readData(14 + 12, &source, sizeof(source));
+								reply_pkt->readData(14 + 16, &dest, sizeof(dest));
+								reply_pkt->readData(14 + 20, tcp_seg, sizeof(tcp_seg));
+
+								packet_checksum = htons(0xFFFF - NetworkUtil::tcp_sum(source, dest, tcp_seg, sizeof(tcp_seg)));
+								reply_pkt->writeData(14 + 20 + 16, &packet_checksum, 2);
+
+								this->sendPacket("IPv4", reply_pkt);
+							}
 						}
 					}
 					else if(connection->tcp_state == TCP_LAST_ACK)
@@ -479,6 +578,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 					timer->type = PAYLOAD_CONNECTION;
 					timer->socket = rcv_socket;
 					timer->connection = connection;
+					printf("timer 3\n");
 
 					timer->uuid = addTimer(timer, TimeUtil::makeTime(60, TimeUtil::SEC));
 				}
@@ -557,21 +657,44 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 			}
 			else if(flags == ACK)
 			{
-				if(payload_len > 0) //read related
+				if(payload_len > 0)
 				{
-					if(rcv_socket->ack_num != seq_num) // out of order packet
+					if(rcv_socket->ack_num <= seq_num)
 					{
-						/*
 						uint8_t payload[MSS];
 						packet->readData(14 + 20 + 20, payload, payload_len);
-						rb_pos_write(rcv_socket->rb, seq_num - rcv_socket->ack_num, payload, payload_len);
+						rb_pos_write(&rcv_socket->rb, seq_num - rcv_socket->ack_num, payload, payload_len);
 
-						if(rcv_socket->cont_end == )
-						*/
+						struct read_info ri;
+						ri.start = rcv_socket->rb.cont_end + seq_num - rcv_socket->ack_num;
+						ri.end = ri.start + payload_len;
+						ri.size = payload_len;
+
+						rcv_socket->rmgr.read_infos.push_back(ri);
+						rcv_socket->rmgr.read_infos.sort(asc_seq);
+						rcv_socket->rmgr.start = ri.start >= rcv_socket->rmgr.start ? rcv_socket->rmgr.start : ri.start;
+						rcv_socket->rmgr.end = ri.end <= rcv_socket->rmgr.end ? rcv_socket->rmgr.end : ri.end;
+						rcv_socket->rmgr.size = (rcv_socket->rmgr.end - rcv_socket->rmgr.start + BUF_SIZE + 1) % (BUF_SIZE + 1);
+
+						while(!rcv_socket->rmgr.read_infos.empty())
+						{
+							if(rcv_socket->rb.cont_end == (*rcv_socket->rmgr.read_infos.begin()).start)
+							{
+								rcv_socket->ack_num = (*rcv_socket->rmgr.read_infos.begin()).seq_num + (*rcv_socket->rmgr.read_infos.begin()).size;
+								rcv_socket->rb.cont_end = (*rcv_socket->rmgr.read_infos.begin()).end;
+								rcv_socket->rb.cont_size += (*rcv_socket->rmgr.read_infos.begin()).size;
+								rcv_socket->rmgr.start = (*rcv_socket->rmgr.read_infos.begin()).start;
+								rcv_socket->rmgr.size -= (*rcv_socket->rmgr.read_infos.begin()).size;
+								rcv_socket->rmgr.read_infos.pop_front();
+							}
+							else
+								break;
+						}
 
 						packet_seq_num = htonl(rcv_socket->seq_num);
 						packet_ack_num = htonl(rcv_socket->ack_num);
 						packet_flags = (uint8_t) ACK;
+						packet_rwnd = BUF_SIZE - rcv_socket->rb.size;
 						packet_checksum = (uint16_t) 0x0000;
 
 						reply_pkt = this->clonePacket(packet);
@@ -582,6 +705,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 						reply_pkt->writeData(14 + 20 + 4, &packet_seq_num, 4);
 						reply_pkt->writeData(14 + 20 + 8, &packet_ack_num, 4);
 						reply_pkt->writeData(14 + 20 + 13, &packet_flags, 1);
+						reply_pkt->writeData(14 + 20 + 14, &packet_rwnd, 2);
 						reply_pkt->writeData(14 + 20 + 16, &packet_checksum, 2);
 
 						reply_pkt->readData(14 + 12, &source, sizeof(source));
@@ -595,18 +719,10 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 					}
 					else
 					{
-						uint8_t payload[MSS];
-						packet->readData(14 + 20 + 20, payload, payload_len);
-						rb_write(&rcv_socket->rb, payload, payload_len);
-
-						rcv_socket->rb.cont_size += payload_len;
-						rcv_socket->rb.cont_end = rcv_socket->rb.start + rcv_socket->rb.cont_size;
-
-						rcv_socket->ack_num += payload_len;
-
 						packet_seq_num = htonl(rcv_socket->seq_num);
 						packet_ack_num = htonl(rcv_socket->ack_num);
 						packet_flags = (uint8_t) ACK;
+						packet_rwnd = BUF_SIZE - rcv_socket->rb.size;
 						packet_checksum = (uint16_t) 0x0000;
 
 						reply_pkt = this->clonePacket(packet);
@@ -617,6 +733,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 						reply_pkt->writeData(14 + 20 + 4, &packet_seq_num, 4);
 						reply_pkt->writeData(14 + 20 + 8, &packet_ack_num, 4);
 						reply_pkt->writeData(14 + 20 + 13, &packet_flags, 1);
+						reply_pkt->writeData(14 + 20 + 14, &packet_rwnd, 2);
 						reply_pkt->writeData(14 + 20 + 16, &packet_checksum, 2);
 
 						reply_pkt->readData(14 + 12, &source, sizeof(source));
@@ -627,28 +744,20 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 						reply_pkt->writeData(14 + 20 + 16, &packet_checksum, 2);
 
 						this->sendPacket("IPv4", reply_pkt);
-
-						/*
-						if(rcv_socket->rb.end + payload_len <= BUF_SIZE)
-						{
-							packet->readData(14 + 20 + 20, rcv_socket->rb.buffer + rcv_socket->rb.end, payload_len);
-							rcv_socket->rb.end += payload_len;
-							rcv_socket->rb.size += payload_len;
-						}
-						else
-						{
-							packet->readData(14 + 20 + 20, &rcv_socket->rb.buffer + rcv_socket->rb.end, BUF_SIZE - rcv_socket->rb.end);
-							packet->readData(14 + 20 + 20, &rcv_socket->rb.buffer, payload_len - (BUF_SIZE - rcv_socket->rb.end));
-							rcv_socket->rb.end = payload_len - (BUF_SIZE - rcv_socket->rb.end);
-						}
-						//memcpy to read buf
-						rcv_socket->ack_num = seq_num + payload_len;
-						rcv_socket->rwnd -= payload_len;
-						*/
 					}
-					//send ack
+				
+					if(rcv_socket->read_called)
+					{
+						if(rcv_socket->rb.cont_size > 0)
+						{
+							size_t read_count = rb_read(&rcv_socket->rb, rcv_socket->read_buf, rcv_socket->read_count);
 
-					//handle blocked read
+							rcv_socket->rb.start = (rcv_socket->rb.start + read_count) % (BUF_SIZE + 1);
+							rcv_socket->rb.size -= read_count;
+
+							this->returnSystemCall(rcv_socket->uuid, read_count);
+						}
+					}
 				}
 				else
 				{
@@ -670,14 +779,14 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 								uint8_t payload[MSS];
 								size_t read_count = wb_read(&rcv_socket->wb, payload, wi->size);
 
-								uint16_t packet_totallen = htons(read_count);
-								uint32_t packet_seq_num = htonl(wi->seq_num);
-								uint32_t packet_ack_num = htonl(0x00000000);
-								uint8_t packet_headerlen = (uint8_t) 0x50;
-								uint8_t packet_flags = (uint8_t) ACK;
-								uint16_t packet_rwnd = (uint16_t) htons(BUF_SIZE);
-								uint16_t packet_checksum = (uint16_t) 0x0000;
-								uint16_t packet_pointer = (uint16_t) 0x0000;
+								packet_totallen = htons(read_count);
+								packet_seq_num = htonl(wi->seq_num);
+								packet_ack_num = htonl(0x00000000);
+								packet_headerlen = (uint8_t) 0x50;
+								packet_flags = (uint8_t) ACK;
+								packet_rwnd = (uint16_t) htons(BUF_SIZE);
+								packet_checksum = (uint16_t) 0x0000;
+								packet_pointer = (uint16_t) 0x0000;
 
 								Packet *wr_pkt = this->allocatePacket(14 + 20 + 20 + wi->size);
 								wr_pkt->writeData(14 + 2, &packet_totallen, 2);
@@ -695,12 +804,200 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 								wr_pkt->writeData(14 + 20 + 20, payload, read_count);
 
 								uint32_t source, dest;
-								uint8_t tcp_seg[20];
+								uint8_t tcp_seg_payload[20 + wi->size];
 								wr_pkt->readData(14 + 12, &source, sizeof(source));
 								wr_pkt->readData(14 + 16, &dest, sizeof(dest));
-								wr_pkt->readData(14 + 20, tcp_seg, sizeof(tcp_seg));
+								wr_pkt->readData(14 + 20, tcp_seg_payload, sizeof(tcp_seg_payload));
 								
-								packet_checksum = htons(0xFFFF - NetworkUtil::tcp_sum(source, dest, tcp_seg, sizeof(tcp_seg)));
+								packet_checksum = htons(0xFFFF - NetworkUtil::tcp_sum(source, dest, tcp_seg_payload, sizeof(tcp_seg_payload)));
+								wr_pkt->writeData(14 + 20 + 16, &packet_checksum, 2);
+
+								this->sendPacket("IPv4", wr_pkt);
+							}
+
+							struct timer_payload *timer = new struct timer_payload;
+							timer->type = PAYLOAD_PACKET;
+							timer->socket = rcv_socket;
+							rcv_socket->retransmit_timer = timer;
+
+							rcv_socket->retransmit_timer->uuid = addTimer(rcv_socket->retransmit_timer, TimeUtil::makeTime(100, TimeUtil::MSEC));
+						}
+					}
+					else
+					{
+						printf("1 \n");
+						rcv_socket->smallest_unacked = ack_num;
+						rcv_socket->dup_ack_count = 0;
+
+						while(!rcv_socket->wmgr.write_infos.empty())
+						{
+							auto wi_iter = rcv_socket->wmgr.write_infos.begin();
+							struct write_info *wi = &*wi_iter;
+							if(wi->seq_num == ack_num)
+								break;
+							else
+							{
+								rcv_socket->wb.start = wi->end;
+								rcv_socket->wb.size -= wi->size;
+								rcv_socket->wmgr.start = wi->end;
+								rcv_socket->wmgr.size -= wi->size;
+								rcv_socket->wmgr.write_infos.pop_front();
+							}
+						}
+						printf("2 \n");
+						cancelTimer(rcv_socket->retransmit_timer->uuid);
+						delete(rcv_socket->retransmit_timer);
+						printf("3 \n");
+						if(rcv_socket->write_called)
+						{
+							printf("4 \n");
+							if(rcv_socket->write_count <= BUF_SIZE - rcv_socket->wb.size)
+							{
+								printf("5 \n");
+								size_t write_count = wb_write(&rcv_socket->wb, rcv_socket->write_buf, rcv_socket->write_count);
+								printf("6 \n");
+								rcv_socket->write_called = false;
+								rcv_socket->write_buf = NULL;
+								rcv_socket->write_count = 0;
+								printf("6.2\n");
+								printf("uuid is %d write_count %d \n", rcv_socket->uuid, write_count);
+								this->returnSystemCall(rcv_socket->uuid, write_count);
+								printf("6.3 \n");
+
+							}
+						}
+
+						if(rcv_socket->rwnd >= rcv_socket->wmgr.size)
+						{
+							printf("6.5 \n");
+
+							uint32_t seg_len;
+							while(rcv_socket->wb.size - rcv_socket->wmgr.size > 0)
+							{
+								printf("6.8 \n");
+
+								seg_len = rcv_socket->wb.size - rcv_socket->wmgr.size >= MSS ? MSS : rcv_socket->wb.size - rcv_socket->wmgr.size;
+
+								struct write_info wi;
+								wi.start = rcv_socket->wb.end;
+								wi.end = (wi.start + seg_len) % (BUF_SIZE + 1);
+								wi.size = seg_len;
+								wi.seq_num = rcv_socket->seq_num;
+								printf("7 \n");
+								uint8_t payload[MSS];
+								size_t read_count = wb_read(&rcv_socket->wb, payload, wi.size);
+								printf("8 \n");
+								uint16_t packet_totallen = htons(read_count);
+								uint32_t packet_seq_num = htonl(rcv_socket->seq_num);
+								uint32_t packet_ack_num = htonl(0x00000000);
+								uint8_t packet_headerlen = (uint8_t) 0x50;
+								uint8_t packet_flags = (uint8_t) ACK;
+								uint16_t packet_rwnd = (uint16_t) htons(BUF_SIZE - rcv_socket->rb.size);
+								uint16_t packet_checksum = (uint16_t) 0x0000;
+								uint16_t packet_pointer = (uint16_t) 0x0000;
+
+								Packet *wr_pkt = this->allocatePacket(14 + 20 + 20 + wi.size);
+								wr_pkt->writeData(14 + 2, &packet_totallen, 2);
+								wr_pkt->writeData(14 + 12, &((struct sockaddr_in *)&rcv_socket->src_addr)->sin_addr.s_addr, 4);
+								wr_pkt->writeData(14 + 16, &((struct sockaddr_in *)&rcv_socket->dst_addr)->sin_addr.s_addr, 4);
+								wr_pkt->writeData(14 + 20 + 0, &((struct sockaddr_in *)&rcv_socket->src_addr)->sin_port, 2);
+								wr_pkt->writeData(14 + 20 + 2, &((struct sockaddr_in *)&rcv_socket->dst_addr)->sin_port, 2);
+								wr_pkt->writeData(14 + 20 + 4, &packet_seq_num, 4);
+								wr_pkt->writeData(14 + 20 + 8, &packet_ack_num, 4);
+								wr_pkt->writeData(14 + 20 + 12, &packet_headerlen, 1);
+								wr_pkt->writeData(14 + 20 + 13, &packet_flags, 1);
+								wr_pkt->writeData(14 + 20 + 14, &packet_rwnd, 2);
+								wr_pkt->writeData(14 + 20 + 16, &packet_checksum, 2);
+								wr_pkt->writeData(14 + 20 + 18, &packet_pointer, 2);
+								wr_pkt->writeData(14 + 20 + 20, payload, read_count);
+
+								uint32_t source, dest;
+								uint8_t tcp_seg_payload[20 + wi.size];
+								wr_pkt->readData(14 + 12, &source, sizeof(source));
+								wr_pkt->readData(14 + 16, &dest, sizeof(dest));
+								wr_pkt->readData(14 + 20, tcp_seg_payload, sizeof(tcp_seg_payload));
+								
+								packet_checksum = htons(0xFFFF - NetworkUtil::tcp_sum(source, dest, tcp_seg_payload, sizeof(tcp_seg_payload)));
+								wr_pkt->writeData(14 + 20 + 16, &packet_checksum, 2);
+
+								this->sendPacket("IPv4", wr_pkt);
+
+								if(rcv_socket->wmgr.write_infos.empty())
+								{
+									struct timer_payload *timer = new struct timer_payload;
+									timer->type = PAYLOAD_PACKET;
+									timer->socket = rcv_socket;
+									rcv_socket->retransmit_timer = timer;
+
+									timer->uuid = addTimer(timer, TimeUtil::makeTime(100, TimeUtil::MSEC));
+								}
+
+								rcv_socket->wmgr.write_infos.push_back(wi);
+								rcv_socket->wmgr.end = wi.end;
+								rcv_socket->wmgr.size += wi.size;
+								rcv_socket->seq_num += wi.size;
+								printf("9 \n");
+							}
+						}
+					}
+				}
+			}
+			break;
+
+		case TCP_CLOSE_WAIT:
+			if(flags == ACK)
+			{
+				if(payload_len == 0)
+				{
+					if(rcv_socket->smallest_unacked == ack_num)
+					{
+						rcv_socket->dup_ack_count++;
+						if(rcv_socket->dup_ack_count >= 3)
+						{
+							cancelTimer((rcv_socket->retransmit_timer)->uuid);
+							delete(rcv_socket->retransmit_timer);
+
+							rcv_socket->dup_ack_count = 0;
+
+							struct write_manager wmgr = rcv_socket->wmgr;
+							for(auto wi_iter = wmgr.write_infos.begin(); wi_iter != wmgr.write_infos.end(); ++wi_iter)
+							{
+								struct write_info *wi = &*wi_iter;
+
+								uint8_t payload[MSS];
+								size_t read_count = wb_read(&rcv_socket->wb, payload, wi->size);
+
+								packet_totallen = htons(read_count);
+								packet_seq_num = htonl(wi->seq_num);
+								packet_ack_num = htonl(0x00000000);
+								packet_headerlen = (uint8_t) 0x50;
+								packet_flags = (uint8_t) ACK;
+								packet_rwnd = (uint16_t) htons(BUF_SIZE);
+								packet_checksum = (uint16_t) 0x0000;
+								packet_pointer = (uint16_t) 0x0000;
+
+								Packet *wr_pkt = this->allocatePacket(14 + 20 + 20 + wi->size);
+								wr_pkt->writeData(14 + 2, &packet_totallen, 2);
+								wr_pkt->writeData(14 + 12, &((struct sockaddr_in *)&rcv_socket->src_addr)->sin_addr.s_addr, 4);
+								wr_pkt->writeData(14 + 16, &((struct sockaddr_in *)&rcv_socket->dst_addr)->sin_addr.s_addr, 4);
+								wr_pkt->writeData(14 + 20 + 0, &((struct sockaddr_in *)&rcv_socket->src_addr)->sin_port, 2);
+								wr_pkt->writeData(14 + 20 + 2, &((struct sockaddr_in *)&rcv_socket->dst_addr)->sin_port, 2);
+								wr_pkt->writeData(14 + 20 + 4, &packet_seq_num, 4);
+								wr_pkt->writeData(14 + 20 + 8, &packet_ack_num, 4);
+								wr_pkt->writeData(14 + 20 + 12, &packet_headerlen, 1);
+								wr_pkt->writeData(14 + 20 + 13, &packet_flags, 1);
+								wr_pkt->writeData(14 + 20 + 14, &packet_rwnd, 2);
+								wr_pkt->writeData(14 + 20 + 16, &packet_checksum, 2);
+								wr_pkt->writeData(14 + 20 + 18, &packet_pointer, 2);
+								wr_pkt->writeData(14 + 20 + 20, payload, read_count);
+
+								uint32_t source, dest;
+								uint8_t tcp_seg_payload[20 + wi->size];
+								wr_pkt->readData(14 + 12, &source, sizeof(source));
+								wr_pkt->readData(14 + 16, &dest, sizeof(dest));
+								wr_pkt->readData(14 + 20, tcp_seg_payload, sizeof(tcp_seg_payload));
+								
+								packet_checksum = htons(0xFFFF - NetworkUtil::tcp_sum(source, dest, tcp_seg_payload, sizeof(tcp_seg_payload)));
 								wr_pkt->writeData(14 + 20 + 16, &packet_checksum, 2);
 
 								this->sendPacket("IPv4", wr_pkt);
@@ -737,20 +1034,6 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 
 						cancelTimer(rcv_socket->retransmit_timer->uuid);
 						delete(rcv_socket->retransmit_timer);
-
-						if(rcv_socket->write_called)
-						{
-							if(rcv_socket->write_count <= BUF_SIZE - rcv_socket->wb.size)
-							{
-								size_t write_count = wb_write(&rcv_socket->wb, rcv_socket->write_buf, rcv_socket->write_count);
-
-								rcv_socket->write_called = false;
-								rcv_socket->write_buf = NULL;
-								rcv_socket->write_count = 0;
-
-								this->returnSystemCall(rcv_socket->uuid, write_count);
-							}
-						}
 
 						if(rcv_socket->rwnd >= rcv_socket->wmgr.size)
 						{
@@ -793,12 +1076,12 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 								wr_pkt->writeData(14 + 20 + 20, payload, read_count);
 
 								uint32_t source, dest;
-								uint8_t tcp_seg[20];
+								uint8_t tcp_seg_payload[20 + wi.size];
 								wr_pkt->readData(14 + 12, &source, sizeof(source));
 								wr_pkt->readData(14 + 16, &dest, sizeof(dest));
-								wr_pkt->readData(14 + 20, tcp_seg, sizeof(tcp_seg));
+								wr_pkt->readData(14 + 20, tcp_seg_payload, sizeof(tcp_seg_payload));
 								
-								packet_checksum = htons(0xFFFF - NetworkUtil::tcp_sum(source, dest, tcp_seg, sizeof(tcp_seg)));
+								packet_checksum = htons(0xFFFF - NetworkUtil::tcp_sum(source, dest, tcp_seg_payload, sizeof(tcp_seg_payload)));
 								wr_pkt->writeData(14 + 20 + 16, &packet_checksum, 2);
 
 								this->sendPacket("IPv4", wr_pkt);
@@ -822,7 +1105,6 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 					}
 				}
 			}
-			break;
 
 		case TCP_LAST_ACK:
 			if(flags == ACK)
@@ -840,8 +1122,100 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 		case TCP_FIN_WAIT_1:
 			if(flags == ACK)
 			{
-				if(rcv_socket->seq_num == ack_num)
-					rcv_socket->tcp_state = TCP_FIN_WAIT_2;
+				if(payload_len > 0)
+				{
+					if(rcv_socket->ack_num <= seq_num)
+					{
+						uint8_t payload[MSS];
+						packet->readData(14 + 20 + 20, payload, payload_len);
+						rb_pos_write(&rcv_socket->rb, seq_num - rcv_socket->ack_num, payload, payload_len);
+
+						struct read_info ri;
+						ri.start = rcv_socket->rb.cont_end + seq_num - rcv_socket->ack_num;
+						ri.end = ri.start + payload_len;
+						ri.size = payload_len;
+
+						rcv_socket->rmgr.read_infos.push_back(ri);
+						rcv_socket->rmgr.read_infos.sort(asc_seq);
+						rcv_socket->rmgr.start = ri.start >= rcv_socket->rmgr.start ? rcv_socket->rmgr.start : ri.start;
+						rcv_socket->rmgr.end = ri.end <= rcv_socket->rmgr.end ? rcv_socket->rmgr.end : ri.end;
+						rcv_socket->rmgr.size = (rcv_socket->rmgr.end - rcv_socket->rmgr.start + BUF_SIZE + 1) % (BUF_SIZE + 1);
+
+						while(!rcv_socket->rmgr.read_infos.empty())
+						{
+							if(rcv_socket->rb.cont_end == (*rcv_socket->rmgr.read_infos.begin()).start)
+							{
+								rcv_socket->ack_num = (*rcv_socket->rmgr.read_infos.begin()).seq_num + (*rcv_socket->rmgr.read_infos.begin()).size;
+								rcv_socket->rb.cont_end = (*rcv_socket->rmgr.read_infos.begin()).end;
+								rcv_socket->rb.cont_size += (*rcv_socket->rmgr.read_infos.begin()).size;
+								rcv_socket->rmgr.start = (*rcv_socket->rmgr.read_infos.begin()).start;
+								rcv_socket->rmgr.size -= (*rcv_socket->rmgr.read_infos.begin()).size;
+								rcv_socket->rmgr.read_infos.pop_front();
+							}
+							else
+								break;
+						}
+
+						packet_seq_num = htonl(rcv_socket->seq_num);
+						packet_ack_num = htonl(rcv_socket->ack_num);
+						packet_flags = (uint8_t) ACK;
+						packet_rwnd = BUF_SIZE - rcv_socket->rb.size;
+						packet_checksum = (uint16_t) 0x0000;
+
+						reply_pkt = this->clonePacket(packet);
+						reply_pkt->writeData(14 + 12, &dst_ip, 4);
+						reply_pkt->writeData(14 + 16, &src_ip, 4);
+						reply_pkt->writeData(14 + 20 + 0, &dst_port, 2);
+						reply_pkt->writeData(14 + 20 + 2, &src_port, 2);
+						reply_pkt->writeData(14 + 20 + 4, &packet_seq_num, 4);
+						reply_pkt->writeData(14 + 20 + 8, &packet_ack_num, 4);
+						reply_pkt->writeData(14 + 20 + 13, &packet_flags, 1);
+						reply_pkt->writeData(14 + 20 + 14, &packet_rwnd, 2);
+						reply_pkt->writeData(14 + 20 + 16, &packet_checksum, 2);
+
+						reply_pkt->readData(14 + 12, &source, sizeof(source));
+						reply_pkt->readData(14 + 16, &dest, sizeof(dest));
+						reply_pkt->readData(14 + 20, tcp_seg, sizeof(tcp_seg));
+
+						packet_checksum = htons(0xFFFF - NetworkUtil::tcp_sum(source, dest, tcp_seg, sizeof(tcp_seg)));
+						reply_pkt->writeData(14 + 20 + 16, &packet_checksum, 2);
+
+						this->sendPacket("IPv4", reply_pkt);
+					}
+					else
+					{
+						packet_seq_num = htonl(rcv_socket->seq_num);
+						packet_ack_num = htonl(rcv_socket->ack_num);
+						packet_flags = (uint8_t) ACK;
+						packet_rwnd = BUF_SIZE - rcv_socket->rb.size;
+						packet_checksum = (uint16_t) 0x0000;
+
+						reply_pkt = this->clonePacket(packet);
+						reply_pkt->writeData(14 + 12, &dst_ip, 4);
+						reply_pkt->writeData(14 + 16, &src_ip, 4);
+						reply_pkt->writeData(14 + 20 + 0, &dst_port, 2);
+						reply_pkt->writeData(14 + 20 + 2, &src_port, 2);
+						reply_pkt->writeData(14 + 20 + 4, &packet_seq_num, 4);
+						reply_pkt->writeData(14 + 20 + 8, &packet_ack_num, 4);
+						reply_pkt->writeData(14 + 20 + 13, &packet_flags, 1);
+						reply_pkt->writeData(14 + 20 + 14, &packet_rwnd, 2);
+						reply_pkt->writeData(14 + 20 + 16, &packet_checksum, 2);
+
+						reply_pkt->readData(14 + 12, &source, sizeof(source));
+						reply_pkt->readData(14 + 16, &dest, sizeof(dest));
+						reply_pkt->readData(14 + 20, tcp_seg, sizeof(tcp_seg));
+
+						packet_checksum = htons(0xFFFF - NetworkUtil::tcp_sum(source, dest, tcp_seg, sizeof(tcp_seg)));
+						reply_pkt->writeData(14 + 20 + 16, &packet_checksum, 2);
+
+						this->sendPacket("IPv4", reply_pkt);
+					}
+				}
+				else
+				{
+					if(rcv_socket->seq_num == ack_num)
+						rcv_socket->tcp_state = TCP_FIN_WAIT_2;
+				}
 			}
 			else if(flags == FIN)
 			{
@@ -876,7 +1250,99 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 			break;
 
 		case TCP_FIN_WAIT_2:
-			if(flags == FIN)
+			if(flags == ACK)
+			{
+				if(payload_len > 0)
+				{
+					if(rcv_socket->ack_num <= seq_num)
+					{
+						uint8_t payload[MSS];
+						packet->readData(14 + 20 + 20, payload, payload_len);
+						rb_pos_write(&rcv_socket->rb, seq_num - rcv_socket->ack_num, payload, payload_len);
+
+						struct read_info ri;
+						ri.start = rcv_socket->rb.cont_end + seq_num - rcv_socket->ack_num;
+						ri.end = ri.start + payload_len;
+						ri.size = payload_len;
+
+						rcv_socket->rmgr.read_infos.push_back(ri);
+						rcv_socket->rmgr.read_infos.sort(asc_seq);
+						rcv_socket->rmgr.start = ri.start >= rcv_socket->rmgr.start ? rcv_socket->rmgr.start : ri.start;
+						rcv_socket->rmgr.end = ri.end <= rcv_socket->rmgr.end ? rcv_socket->rmgr.end : ri.end;
+						rcv_socket->rmgr.size = (rcv_socket->rmgr.end - rcv_socket->rmgr.start + BUF_SIZE + 1) % (BUF_SIZE + 1);
+
+						while(!rcv_socket->rmgr.read_infos.empty())
+						{
+							if(rcv_socket->rb.cont_end == (*rcv_socket->rmgr.read_infos.begin()).start)
+							{
+								rcv_socket->ack_num = (*rcv_socket->rmgr.read_infos.begin()).seq_num + (*rcv_socket->rmgr.read_infos.begin()).size;
+								rcv_socket->rb.cont_end = (*rcv_socket->rmgr.read_infos.begin()).end;
+								rcv_socket->rb.cont_size += (*rcv_socket->rmgr.read_infos.begin()).size;
+								rcv_socket->rmgr.start = (*rcv_socket->rmgr.read_infos.begin()).start;
+								rcv_socket->rmgr.size -= (*rcv_socket->rmgr.read_infos.begin()).size;
+								rcv_socket->rmgr.read_infos.pop_front();
+							}
+							else
+								break;
+						}
+
+						packet_seq_num = htonl(rcv_socket->seq_num);
+						packet_ack_num = htonl(rcv_socket->ack_num);
+						packet_flags = (uint8_t) ACK;
+						packet_rwnd = BUF_SIZE - rcv_socket->rb.size;
+						packet_checksum = (uint16_t) 0x0000;
+
+						reply_pkt = this->clonePacket(packet);
+						reply_pkt->writeData(14 + 12, &dst_ip, 4);
+						reply_pkt->writeData(14 + 16, &src_ip, 4);
+						reply_pkt->writeData(14 + 20 + 0, &dst_port, 2);
+						reply_pkt->writeData(14 + 20 + 2, &src_port, 2);
+						reply_pkt->writeData(14 + 20 + 4, &packet_seq_num, 4);
+						reply_pkt->writeData(14 + 20 + 8, &packet_ack_num, 4);
+						reply_pkt->writeData(14 + 20 + 13, &packet_flags, 1);
+						reply_pkt->writeData(14 + 20 + 14, &packet_rwnd, 2);
+						reply_pkt->writeData(14 + 20 + 16, &packet_checksum, 2);
+
+						reply_pkt->readData(14 + 12, &source, sizeof(source));
+						reply_pkt->readData(14 + 16, &dest, sizeof(dest));
+						reply_pkt->readData(14 + 20, tcp_seg, sizeof(tcp_seg));
+
+						packet_checksum = htons(0xFFFF - NetworkUtil::tcp_sum(source, dest, tcp_seg, sizeof(tcp_seg)));
+						reply_pkt->writeData(14 + 20 + 16, &packet_checksum, 2);
+
+						this->sendPacket("IPv4", reply_pkt);
+					}
+					else
+					{
+						packet_seq_num = htonl(rcv_socket->seq_num);
+						packet_ack_num = htonl(rcv_socket->ack_num);
+						packet_flags = (uint8_t) ACK;
+						packet_rwnd = BUF_SIZE - rcv_socket->rb.size;
+						packet_checksum = (uint16_t) 0x0000;
+
+						reply_pkt = this->clonePacket(packet);
+						reply_pkt->writeData(14 + 12, &dst_ip, 4);
+						reply_pkt->writeData(14 + 16, &src_ip, 4);
+						reply_pkt->writeData(14 + 20 + 0, &dst_port, 2);
+						reply_pkt->writeData(14 + 20 + 2, &src_port, 2);
+						reply_pkt->writeData(14 + 20 + 4, &packet_seq_num, 4);
+						reply_pkt->writeData(14 + 20 + 8, &packet_ack_num, 4);
+						reply_pkt->writeData(14 + 20 + 13, &packet_flags, 1);
+						reply_pkt->writeData(14 + 20 + 14, &packet_rwnd, 2);
+						reply_pkt->writeData(14 + 20 + 16, &packet_checksum, 2);
+
+						reply_pkt->readData(14 + 12, &source, sizeof(source));
+						reply_pkt->readData(14 + 16, &dest, sizeof(dest));
+						reply_pkt->readData(14 + 20, tcp_seg, sizeof(tcp_seg));
+
+						packet_checksum = htons(0xFFFF - NetworkUtil::tcp_sum(source, dest, tcp_seg, sizeof(tcp_seg)));
+						reply_pkt->writeData(14 + 20 + 16, &packet_checksum, 2);
+
+						this->sendPacket("IPv4", reply_pkt);
+					}
+				}
+			}
+			else if(flags == FIN)
 			{
 				rcv_socket->ack_num = seq_num + 1;
 
@@ -909,6 +1375,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 				struct timer_payload *timer = new struct timer_payload;
 				timer->type = PAYLOAD_SOCKET;
 				timer->socket = rcv_socket;
+				printf("timer 1\n");
 
 				timer->uuid = addTimer(timer, TimeUtil::makeTime(60, TimeUtil::SEC));
 			}
@@ -924,6 +1391,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 					struct timer_payload *timer = new struct timer_payload;
 					timer->type = PAYLOAD_SOCKET;
 					timer->socket = rcv_socket;
+					printf("timer 2\n");
 
 					timer->uuid = addTimer(timer, TimeUtil::makeTime(60, TimeUtil::SEC));
 				}
@@ -959,7 +1427,8 @@ void TCPAssignment::timerCallback(void *payload)
 			}
 		}
 		if(!found)
-			assert(0);
+			return;
+			//assert(0);
 
 		socket->connections.clear();
 		std::array<int, 2> fd_to_pid = {fd, socket->pid};
@@ -1026,7 +1495,7 @@ void TCPAssignment::timerCallback(void *payload)
 			uint8_t payload[MSS];
 			size_t payload_len = wb_read(&socket->wb, payload, wi->size);
 
-			uint16_t packet_totallen = htons(payload_len);
+			uint16_t packet_totallen = htons(payload_len + 40);
 			uint32_t packet_seq_num = htonl(wi->seq_num);
 			uint32_t packet_ack_num = htonl(0x00000000);
 			uint8_t packet_headerlen = (uint8_t) 0x50;
@@ -1051,12 +1520,12 @@ void TCPAssignment::timerCallback(void *payload)
 			wr_pkt->writeData(14 + 20 + 20, payload, payload_len);
 
 			uint32_t source, dest;
-			uint8_t tcp_seg[20];
+			uint8_t tcp_seg_payload[20 + wi->size];
 			wr_pkt->readData(14 + 12, &source, sizeof(source));
 			wr_pkt->readData(14 + 16, &dest, sizeof(dest));
-			wr_pkt->readData(14 + 20, tcp_seg, sizeof(tcp_seg));
+			wr_pkt->readData(14 + 20, tcp_seg_payload, sizeof(tcp_seg_payload));
 			
-			packet_checksum = htons(0xFFFF - NetworkUtil::tcp_sum(source, dest, tcp_seg, sizeof(tcp_seg)));
+			packet_checksum = htons(0xFFFF - NetworkUtil::tcp_sum(source, dest, tcp_seg_payload, sizeof(tcp_seg_payload)));
 			wr_pkt->writeData(14 + 20 + 16, &packet_checksum, 2);
 
 			this->sendPacket("IPv4", wr_pkt);
@@ -1088,6 +1557,7 @@ void TCPAssignment::syscall_socket(UUID syscallUUID, int pid, int domain, int ty
 	static struct sockaddr empty_addr;
 	static struct read_buffer empty_rb;
 	static struct write_buffer empty_wb;
+	static struct read_manager empty_rmgr;
 	static struct write_manager empty_wmgr;
 	socket.uuid = 0;
 	socket.pid = pid;
@@ -1103,6 +1573,7 @@ void TCPAssignment::syscall_socket(UUID syscallUUID, int pid, int domain, int ty
 	socket.accept_called = false;
 	socket.accept_addr = NULL;
 	socket.accept_addrlen = NULL;
+	socket.rmgr = empty_rmgr;
 	socket.rb = empty_rb;
 	socket.read_called = false;
 	socket.read_buf = NULL;
@@ -1353,8 +1824,9 @@ void TCPAssignment::syscall_read(UUID syscallUUID, int pid, int fd, void *buf, s
 
 	if(socket->rb.cont_size > 0)
 	{
+		printf("rb_read \n");
 		size_t read_count = rb_read(&socket->rb, buf, count);
-
+		printf("rb_read success \n");
 		socket->rb.start = (socket->rb.start + read_count) % (BUF_SIZE + 1);
 		socket->rb.size -= read_count;
 
@@ -1396,7 +1868,7 @@ void TCPAssignment::syscall_write(UUID syscallUUID, int pid, int fd, const void 
 
 	if(count <= BUF_SIZE - socket->wb.size)
 	{
-		size_t write_count = wb_write(&socket->wb, buf, count);
+		size_t write_count = wb_write(&socket->wb, (void *)buf, count);
 
 		this->returnSystemCall(syscallUUID, write_count);
 
@@ -1416,7 +1888,7 @@ void TCPAssignment::syscall_write(UUID syscallUUID, int pid, int fd, const void 
 				uint8_t payload[MSS];
 				size_t payload_len = wb_read(&socket->wb, payload, wi.size);
 
-				uint16_t packet_totallen = htons(wi.size);
+				uint16_t packet_totallen = htons(payload_len + 40);
 				uint32_t packet_seq_num = htonl(socket->seq_num);
 				uint32_t packet_ack_num = htonl(socket->ack_num);
 				uint8_t packet_headerlen = (uint8_t) 0x50;
@@ -1441,12 +1913,12 @@ void TCPAssignment::syscall_write(UUID syscallUUID, int pid, int fd, const void 
 				wr_pkt->writeData(14 + 20 + 20, payload, payload_len);
 
 				uint32_t source, dest;
-				uint8_t tcp_seg[20];
+				uint8_t tcp_seg_payload[20 + wi.size];
 				wr_pkt->readData(14 + 12, &source, sizeof(source));
 				wr_pkt->readData(14 + 16, &dest, sizeof(dest));
-				wr_pkt->readData(14 + 20, tcp_seg, sizeof(tcp_seg));
+				wr_pkt->readData(14 + 20, tcp_seg_payload, sizeof(tcp_seg_payload));
 				
-				packet_checksum = htons(0xFFFF - NetworkUtil::tcp_sum(source, dest, tcp_seg, sizeof(tcp_seg)));
+				packet_checksum = htons(0xFFFF - NetworkUtil::tcp_sum(source, dest, tcp_seg_payload, sizeof(tcp_seg_payload)));
 				wr_pkt->writeData(14 + 20 + 16, &packet_checksum, 2);
 
 				this->sendPacket("IPv4", wr_pkt);
@@ -1468,18 +1940,14 @@ void TCPAssignment::syscall_write(UUID syscallUUID, int pid, int fd, const void 
 
 			}
 		}
-
-		return;
 	}
 	else
 	{
-		printf("write blocked\n");
 		socket->write_called = true;
-		socket->write_buf = buf;
+		socket->write_buf = (void *)buf;
 		socket->write_count = count;
 
 		socket->uuid = syscallUUID;
-		return;
 	}
 }
 
@@ -1666,8 +2134,7 @@ void TCPAssignment::syscall_accept(UUID syscallUUID, int pid, int sockfd,
 		}
 
 		struct sock_info s_socket;
-		static struct read_buffer empty_rb;
-		static struct write_buffer empty_wb;
+		static struct write_buffer empty_wb;		
 		static struct write_manager empty_wmgr;
 		s_socket.uuid = 0;
 		s_socket.pid = pid;
@@ -1683,7 +2150,8 @@ void TCPAssignment::syscall_accept(UUID syscallUUID, int pid, int sockfd,
 		s_socket.accept_called = false;
 		s_socket.accept_addr = NULL;
 		s_socket.accept_addrlen = NULL;
-		s_socket.rb = empty_rb;
+		s_socket.rmgr = connection->rmgr;
+		s_socket.rb = connection->rb;
 		s_socket.read_called = false;
 		s_socket.read_buf = NULL;
 		s_socket.read_count = 0;
@@ -1839,24 +2307,7 @@ size_t TCPAssignment::rb_read(struct read_buffer *rb, void *buf, size_t count)
 	return read_count;
 }
 
-size_t TCPAssignment::rb_write(struct read_buffer *rb, const void *buf, size_t count)
-{
-	if(rb->end + count > BUF_SIZE)
-	{
-		memcpy(rb->buffer + rb->end, buf, BUF_SIZE - rb->end);
-		memcpy(rb->buffer, (uint8_t *)buf + (BUF_SIZE - rb->end), count - (BUF_SIZE - rb->end));
-		rb->end = count - (BUF_SIZE - rb->end);
-	}
-	else
-	{
-		memcpy(rb->buffer + rb->end, buf, count);
-		rb->end += count;
-	}
-	rb->size += count;
-	return count;
-}
-
-size_t TCPAssignment::rb_pos_write(struct read_buffer *rb, size_t pos, const void *buf, size_t count)
+size_t TCPAssignment::rb_pos_write(struct read_buffer *rb, size_t pos, void *buf, size_t count)
 {
 	if(rb->cont_end + pos + count > BUF_SIZE)
 	{
@@ -1888,7 +2339,7 @@ size_t TCPAssignment::wb_read(struct write_buffer *wb, void *buf, size_t count)
 }
 
 
-size_t TCPAssignment::wb_write(struct write_buffer *wb, const void *buf, size_t count)
+size_t TCPAssignment::wb_write(struct write_buffer *wb, void *buf, size_t count)
 {
 	if(wb->end + count > BUF_SIZE)
 	{
@@ -1903,6 +2354,12 @@ size_t TCPAssignment::wb_write(struct write_buffer *wb, const void *buf, size_t 
 	}
 	wb->size += count;
 	return count;
+}
+
+
+static bool asc_seq(const struct read_info& l, const struct read_info& r)
+{
+   return l.seq_num < r.seq_num;
 }
 
 }

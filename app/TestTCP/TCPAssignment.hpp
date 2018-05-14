@@ -57,6 +57,14 @@ namespace E
 		uint32_t seq_num;
 	};
 
+	struct read_manager
+	{
+		std::list<struct read_info> read_infos;
+		size_t start;
+		size_t end;
+		size_t size;
+	};
+
 	struct write_manager
 	{
 		std::list<struct write_info> write_infos;
@@ -90,6 +98,8 @@ namespace E
 		enum TCP_State tcp_state;
 		uint32_t seq_num;
 		uint32_t ack_num;
+		struct read_manager rmgr;
+		struct read_buffer rb;
 	};
 
 	struct sock_info
@@ -110,23 +120,27 @@ namespace E
 		bool accept_called;
 		sockaddr *accept_addr;
 		socklen_t *accept_addrlen;
-		struct read_buffer rb;
 
+		struct read_manager rmgr;
+		struct read_buffer rb;
 		bool read_called;
-		const void *read_buf;
+		void *read_buf;
 		size_t read_count;
+
 		struct write_manager wmgr;
 		struct write_buffer wb;
-
 		bool write_called;
-		const void *write_buf;
+		void *write_buf;
 		size_t write_count;
+
 		uint32_t smallest_unacked;
 		uint16_t rwnd;
 
 		int dup_ack_count;
 		struct timer_payload *retransmit_timer;
 	};
+
+	static bool asc_seq(const struct read_info& l, const struct read_info& r);
 
 class TCPAssignment : public HostModule, public NetworkModule, public SystemCallInterface, private NetworkLog, private TimerModule
 {
@@ -176,10 +190,10 @@ protected:
 	virtual void packetArrived(std::string fromModule, Packet* packet) final;
 
 	size_t rb_read(struct read_buffer *rb, void *buf, size_t count);
-	size_t rb_write(struct read_buffer *rb, const void *buf, size_t count);
-	size_t rb_pos_write(struct read_buffer *rb, size_t pos, const void *buf, size_t count);
+	size_t rb_pos_write(struct read_buffer *rb, size_t pos, void *buf, size_t count);
 	size_t wb_read(struct write_buffer *wb, void *buf, size_t count);
-	size_t wb_write(struct write_buffer *wb, const void *buf, size_t count);
+	size_t wb_write(struct write_buffer *wb, void *buf, size_t count);
+	//bool asc_seq(const struct read_info& l, const struct read_info& r);
 };
 
 class TCPAssignmentProvider

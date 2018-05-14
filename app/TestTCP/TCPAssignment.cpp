@@ -825,6 +825,8 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 					}
 					else
 					{
+						printf("dup_ack_count is %d \n", rcv_socket->dup_ack_count);
+
 						rcv_socket->smallest_unacked = ack_num;
 						rcv_socket->dup_ack_count = 0;
 
@@ -833,7 +835,11 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 							auto wi_iter = rcv_socket->wmgr.write_infos.begin();
 							struct write_info *wi = &*wi_iter;
 							if(wi->seq_num == ack_num)
+							{
+								printf("escape \n");
 								break;
+							}
+
 							else
 							{
 								rcv_socket->wb.start = wi->end;
@@ -841,26 +847,33 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 								rcv_socket->wmgr.start = wi->end;
 								rcv_socket->wmgr.size -= wi->size;
 								rcv_socket->wmgr.write_infos.pop_front();
+								printf("pop!!! \n");
 							}
 						}
+
 						cancelTimer(rcv_socket->retransmit_timer->uuid);
 						delete(rcv_socket->retransmit_timer);
+
 						if(rcv_socket->write_called)
 						{
+							printf("write_called \n");
 							if(rcv_socket->write_count <= BUF_SIZE - rcv_socket->wb.size)
 							{
+								printf("wr_write try\n");
 								size_t write_count = wb_write(&rcv_socket->wb, rcv_socket->write_buf, rcv_socket->write_count);
-
+								printf("wr_write success\n");
 								rcv_socket->write_called = false;
 								rcv_socket->write_buf = NULL;
 								rcv_socket->write_count = 0;
-
+								printf("uuid is %d \n", rcv_socket->uuid);
 								this->returnSystemCall(rcv_socket->uuid, write_count);
 							}
+							printf("well...\n");
 						}
 
 						if(rcv_socket->rwnd >= rcv_socket->wmgr.size)
 						{
+							printf("got in \n");
 							uint32_t seg_len;
 							while(rcv_socket->wb.size > rcv_socket->wmgr.size)
 							{
@@ -873,7 +886,9 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 								wi.seq_num = rcv_socket->seq_num;
 
 								uint8_t payload[MSS];
+								printf("wb_read_try with start %d size %d\n", wi.start, wi.size);
 								size_t read_count = wb_read(&rcv_socket->wb, wi.start, payload, wi.size);
+								printf("wb_read_success \n");
 								uint16_t packet_totallen = htons(read_count);
 								uint32_t packet_seq_num = htonl(rcv_socket->seq_num);
 								uint32_t packet_ack_num = htonl(0x00000000);
@@ -1931,7 +1946,7 @@ void TCPAssignment::syscall_write(UUID syscallUUID, int pid, int fd, const void 
 		socket->write_called = true;
 		socket->write_buf = (void *)buf;
 		socket->write_count = count;
-
+		printf("blocked uuid is %d \n", syscallUUID);
 		socket->uuid = syscallUUID;
 	}
 }
@@ -2296,7 +2311,7 @@ size_t TCPAssignment::rb_write(struct read_buffer *rb, size_t pos, void *buf, si
 {
 	if(pos + count > BUF_SIZE)
 	{
-		memcpy(rb->buffer + pos, buf, BUF_SIZE - (rb->cont_end + pos));
+		memcpy(rb->buffer + pos, buf, BUF_SIZE - pos);
 		memcpy(rb->buffer, (uint8_t *)buf + (BUF_SIZE - pos), count - (BUF_SIZE - pos));
 		rb->end = rb->end >= count - (BUF_SIZE - pos) ? rb->end : count - (BUF_SIZE - pos);
 		rb->size = rb->end + BUF_SIZE - rb->start;
@@ -2315,7 +2330,7 @@ size_t TCPAssignment::wb_read(struct write_buffer *wb, size_t pos, void *buf, si
 	size_t read_count = wb->size >= count ? count : wb->size;
 	if(pos + read_count > BUF_SIZE)
 	{
-		memcpy(buf, wb->buffer + pos, BUF_SIZE - wb->start);
+		memcpy(buf, wb->buffer + pos, BUF_SIZE - pos);
 		memcpy((uint8_t *)buf + (BUF_SIZE - pos), wb->buffer, read_count - (BUF_SIZE - pos));
 	}
 	else
@@ -2326,6 +2341,7 @@ size_t TCPAssignment::wb_read(struct write_buffer *wb, size_t pos, void *buf, si
 
 size_t TCPAssignment::wb_write(struct write_buffer *wb, void *buf, size_t count)
 {
+	printf("wb.start is %d wb.end %d \n", wb->start, wb->end);
 	if(wb->end + count > BUF_SIZE)
 	{
 		memcpy(wb->buffer + wb->end, buf, BUF_SIZE - wb->end);

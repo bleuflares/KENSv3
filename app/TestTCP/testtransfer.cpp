@@ -231,7 +231,6 @@ protected:
 				int write_byte = 0;
 				while((write_byte = write(client_socket, send_buffer + (buffer_size - remaining), remaining)) >= 0)
 				{
-					printf("write_count is %d \n", write_byte);
 					total_size += write_byte;
 					remaining -= write_byte;
 					EXPECT_GE(remaining, 0);

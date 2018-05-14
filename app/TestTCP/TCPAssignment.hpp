@@ -140,7 +140,7 @@ namespace E
 		struct timer_payload *retransmit_timer;
 	};
 
-	static bool asc_seq(const struct read_info& l, const struct read_info& r);
+	bool asc_seq(const struct read_info& l, const struct read_info& r);
 
 class TCPAssignment : public HostModule, public NetworkModule, public SystemCallInterface, private NetworkLog, private TimerModule
 {
@@ -189,11 +189,12 @@ protected:
 	virtual void systemCallback(UUID syscallUUID, int pid, const SystemCallParameter& param) final;
 	virtual void packetArrived(std::string fromModule, Packet* packet) final;
 
+	void send_packet(uint16_t total_len, uint32_t src_ip, uint32_t dst_ip, uint16_t src_port, uint16_t dst_port, uint32_t seq_num, uint32_t ack_num, uint8_t flags, uint16_t rwnd, void *payload);
+
 	size_t rb_read(struct read_buffer *rb, void *buf, size_t count);
 	size_t rb_write(struct read_buffer *rb, size_t pos, void *buf, size_t count);
 	size_t wb_read(struct write_buffer *wb, size_t pos, void *buf, size_t count);
 	size_t wb_write(struct write_buffer *wb, void *buf, size_t count);
-	//bool asc_seq(const struct read_info& l, const struct read_info& r);
 };
 
 class TCPAssignmentProvider

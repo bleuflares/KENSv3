@@ -353,7 +353,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 							{
 								uint8_t payload[MSS];
 								packet->readData(14 + 20 + 20, payload, payload_len);
-								rb_pos_write(&connection->rb, seq_num - connection->ack_num, payload, payload_len);
+								rb_write(&connection->rb, connection->rb.cont_end + seq_num - connection->ack_num, payload, payload_len);
 
 								struct read_info ri;
 								ri.start = connection->rb.cont_end + seq_num - connection->ack_num;
@@ -364,7 +364,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 								connection->rmgr.read_infos.sort(asc_seq);
 								connection->rmgr.start = ri.start >= connection->rmgr.start ? connection->rmgr.start : ri.start;
 								connection->rmgr.end = ri.end <= connection->rmgr.end ? connection->rmgr.end : ri.end;
-								connection->rmgr.size = (connection->rmgr.end - connection->rmgr.start + BUF_SIZE + 1) % (BUF_SIZE + 1);
+								connection->rmgr.size = (connection->rmgr.end  + BUF_SIZE + 1 - connection->rmgr.start) % (BUF_SIZE + 1);
 
 								while(!connection->rmgr.read_infos.empty())
 								{
@@ -663,7 +663,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 					{
 						uint8_t payload[MSS];
 						packet->readData(14 + 20 + 20, payload, payload_len);
-						rb_pos_write(&rcv_socket->rb, seq_num - rcv_socket->ack_num, payload, payload_len);
+						rb_write(&rcv_socket->rb, rcv_socket->rb.cont_end + seq_num - rcv_socket->ack_num, payload, payload_len);
 
 						struct read_info ri;
 						ri.start = rcv_socket->rb.cont_end + seq_num - rcv_socket->ack_num;
@@ -674,7 +674,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 						rcv_socket->rmgr.read_infos.sort(asc_seq);
 						rcv_socket->rmgr.start = ri.start >= rcv_socket->rmgr.start ? rcv_socket->rmgr.start : ri.start;
 						rcv_socket->rmgr.end = ri.end <= rcv_socket->rmgr.end ? rcv_socket->rmgr.end : ri.end;
-						rcv_socket->rmgr.size = (rcv_socket->rmgr.end - rcv_socket->rmgr.start + BUF_SIZE + 1) % (BUF_SIZE + 1);
+						rcv_socket->rmgr.size = (rcv_socket->rmgr.end + BUF_SIZE + 1 - rcv_socket->rmgr.start) % (BUF_SIZE + 1);
 
 						while(!rcv_socket->rmgr.read_infos.empty())
 						{
@@ -777,7 +777,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 								struct write_info *wi = &*wi_iter;
 
 								uint8_t payload[MSS];
-								size_t read_count = wb_read(&rcv_socket->wb, payload, wi->size);
+								size_t read_count = wb_read(&rcv_socket->wb, wi->start, payload, wi->size);
 
 								packet_totallen = htons(read_count);
 								packet_seq_num = htonl(wi->seq_num);
@@ -825,7 +825,6 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 					}
 					else
 					{
-						printf("1 \n");
 						rcv_socket->smallest_unacked = ack_num;
 						rcv_socket->dup_ack_count = 0;
 
@@ -844,49 +843,37 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 								rcv_socket->wmgr.write_infos.pop_front();
 							}
 						}
-						printf("2 \n");
 						cancelTimer(rcv_socket->retransmit_timer->uuid);
 						delete(rcv_socket->retransmit_timer);
-						printf("3 \n");
 						if(rcv_socket->write_called)
 						{
-							printf("4 \n");
 							if(rcv_socket->write_count <= BUF_SIZE - rcv_socket->wb.size)
 							{
-								printf("5 \n");
 								size_t write_count = wb_write(&rcv_socket->wb, rcv_socket->write_buf, rcv_socket->write_count);
-								printf("6 \n");
+
 								rcv_socket->write_called = false;
 								rcv_socket->write_buf = NULL;
 								rcv_socket->write_count = 0;
-								printf("6.2\n");
-								printf("uuid is %d write_count %d \n", rcv_socket->uuid, write_count);
-								this->returnSystemCall(rcv_socket->uuid, write_count);
-								printf("6.3 \n");
 
+								this->returnSystemCall(rcv_socket->uuid, write_count);
 							}
 						}
 
 						if(rcv_socket->rwnd >= rcv_socket->wmgr.size)
 						{
-							printf("6.5 \n");
-
 							uint32_t seg_len;
-							while(rcv_socket->wb.size - rcv_socket->wmgr.size > 0)
+							while(rcv_socket->wb.size > rcv_socket->wmgr.size)
 							{
-								printf("6.8 \n");
-
 								seg_len = rcv_socket->wb.size - rcv_socket->wmgr.size >= MSS ? MSS : rcv_socket->wb.size - rcv_socket->wmgr.size;
 
 								struct write_info wi;
-								wi.start = rcv_socket->wb.end;
+								wi.start = rcv_socket->wmgr.end;
 								wi.end = (wi.start + seg_len) % (BUF_SIZE + 1);
 								wi.size = seg_len;
 								wi.seq_num = rcv_socket->seq_num;
-								printf("7 \n");
+
 								uint8_t payload[MSS];
-								size_t read_count = wb_read(&rcv_socket->wb, payload, wi.size);
-								printf("8 \n");
+								size_t read_count = wb_read(&rcv_socket->wb, wi.start, payload, wi.size);
 								uint16_t packet_totallen = htons(read_count);
 								uint32_t packet_seq_num = htonl(rcv_socket->seq_num);
 								uint32_t packet_ack_num = htonl(0x00000000);
@@ -965,7 +952,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 								struct write_info *wi = &*wi_iter;
 
 								uint8_t payload[MSS];
-								size_t read_count = wb_read(&rcv_socket->wb, payload, wi->size);
+								size_t read_count = wb_read(&rcv_socket->wb, wi->start, payload, wi->size);
 
 								packet_totallen = htons(read_count);
 								packet_seq_num = htonl(wi->seq_num);
@@ -1038,18 +1025,18 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 						if(rcv_socket->rwnd >= rcv_socket->wmgr.size)
 						{
 							uint32_t seg_len;
-							while(rcv_socket->wb.size - rcv_socket->wmgr.size > 0)
+							while(rcv_socket->wb.size > rcv_socket->wmgr.size)
 							{
 								seg_len = rcv_socket->wb.size - rcv_socket->wmgr.size >= MSS ? MSS : rcv_socket->wb.size - rcv_socket->wmgr.size;
 
 								struct write_info wi;
-								wi.start = rcv_socket->wb.end;
+								wi.start = rcv_socket->wmgr.end;
 								wi.end = (wi.start + seg_len) % (BUF_SIZE + 1);
 								wi.size = seg_len;
 								wi.seq_num = rcv_socket->seq_num;
 
 								uint8_t payload[MSS];
-								size_t read_count = wb_read(&rcv_socket->wb, payload, wi.size);
+								size_t read_count = wb_read(&rcv_socket->wb, wi.start, payload, wi.size);
 
 								uint16_t packet_totallen = htons(read_count);
 								uint32_t packet_seq_num = htonl(rcv_socket->seq_num);
@@ -1128,7 +1115,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 					{
 						uint8_t payload[MSS];
 						packet->readData(14 + 20 + 20, payload, payload_len);
-						rb_pos_write(&rcv_socket->rb, seq_num - rcv_socket->ack_num, payload, payload_len);
+						rb_write(&rcv_socket->rb, rcv_socket->rb.cont_end + seq_num - rcv_socket->ack_num, payload, payload_len);
 
 						struct read_info ri;
 						ri.start = rcv_socket->rb.cont_end + seq_num - rcv_socket->ack_num;
@@ -1139,7 +1126,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 						rcv_socket->rmgr.read_infos.sort(asc_seq);
 						rcv_socket->rmgr.start = ri.start >= rcv_socket->rmgr.start ? rcv_socket->rmgr.start : ri.start;
 						rcv_socket->rmgr.end = ri.end <= rcv_socket->rmgr.end ? rcv_socket->rmgr.end : ri.end;
-						rcv_socket->rmgr.size = (rcv_socket->rmgr.end - rcv_socket->rmgr.start + BUF_SIZE + 1) % (BUF_SIZE + 1);
+						rcv_socket->rmgr.size = (rcv_socket->rmgr.end + BUF_SIZE + 1 - rcv_socket->rmgr.start) % (BUF_SIZE + 1);
 
 						while(!rcv_socket->rmgr.read_infos.empty())
 						{
@@ -1258,7 +1245,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 					{
 						uint8_t payload[MSS];
 						packet->readData(14 + 20 + 20, payload, payload_len);
-						rb_pos_write(&rcv_socket->rb, seq_num - rcv_socket->ack_num, payload, payload_len);
+						rb_write(&rcv_socket->rb, rcv_socket->rb.cont_end + seq_num - rcv_socket->ack_num, payload, payload_len);
 
 						struct read_info ri;
 						ri.start = rcv_socket->rb.cont_end + seq_num - rcv_socket->ack_num;
@@ -1269,7 +1256,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 						rcv_socket->rmgr.read_infos.sort(asc_seq);
 						rcv_socket->rmgr.start = ri.start >= rcv_socket->rmgr.start ? rcv_socket->rmgr.start : ri.start;
 						rcv_socket->rmgr.end = ri.end <= rcv_socket->rmgr.end ? rcv_socket->rmgr.end : ri.end;
-						rcv_socket->rmgr.size = (rcv_socket->rmgr.end - rcv_socket->rmgr.start + BUF_SIZE + 1) % (BUF_SIZE + 1);
+						rcv_socket->rmgr.size = (rcv_socket->rmgr.end + BUF_SIZE + 1 - rcv_socket->rmgr.start) % (BUF_SIZE + 1);
 
 						while(!rcv_socket->rmgr.read_infos.empty())
 						{
@@ -1493,7 +1480,7 @@ void TCPAssignment::timerCallback(void *payload)
 			struct write_info *wi = &*wi_iter;
 
 			uint8_t payload[MSS];
-			size_t payload_len = wb_read(&socket->wb, payload, wi->size);
+			size_t payload_len = wb_read(&socket->wb, wi->start, payload, wi->size);
 
 			uint16_t packet_totallen = htons(payload_len + 40);
 			uint32_t packet_seq_num = htonl(wi->seq_num);
@@ -1824,9 +1811,7 @@ void TCPAssignment::syscall_read(UUID syscallUUID, int pid, int fd, void *buf, s
 
 	if(socket->rb.cont_size > 0)
 	{
-		printf("rb_read \n");
 		size_t read_count = rb_read(&socket->rb, buf, count);
-		printf("rb_read success \n");
 		socket->rb.start = (socket->rb.start + read_count) % (BUF_SIZE + 1);
 		socket->rb.size -= read_count;
 
@@ -1875,18 +1860,18 @@ void TCPAssignment::syscall_write(UUID syscallUUID, int pid, int fd, const void 
 		if(socket->rwnd >= socket->wmgr.size)
 		{
 			uint32_t seg_len;
-			while(socket->wb.size - socket->wmgr.size > 0)
+			while(socket->wb.size > socket->wmgr.size)
 			{
 				seg_len = socket->wb.size - socket->wmgr.size >= MSS ? MSS : socket->wb.size - socket->wmgr.size;
 
 				struct write_info wi;
-				wi.start = socket->wb.end;
+				wi.start = socket->wmgr.end;
 				wi.end = (wi.start + seg_len) % (BUF_SIZE + 1);
 				wi.size = seg_len;
 				wi.seq_num = socket->seq_num;
 
 				uint8_t payload[MSS];
-				size_t payload_len = wb_read(&socket->wb, payload, wi.size);
+				size_t payload_len = wb_read(&socket->wb, wi.start, payload, wi.size);
 
 				uint16_t packet_totallen = htons(payload_len + 40);
 				uint32_t packet_seq_num = htonl(socket->seq_num);
@@ -2307,34 +2292,34 @@ size_t TCPAssignment::rb_read(struct read_buffer *rb, void *buf, size_t count)
 	return read_count;
 }
 
-size_t TCPAssignment::rb_pos_write(struct read_buffer *rb, size_t pos, void *buf, size_t count)
+size_t TCPAssignment::rb_write(struct read_buffer *rb, size_t pos, void *buf, size_t count)
 {
-	if(rb->cont_end + pos + count > BUF_SIZE)
+	if(pos + count > BUF_SIZE)
 	{
-		memcpy(rb->buffer + rb->cont_end + pos, buf, BUF_SIZE - (rb->cont_end + pos));
-		memcpy(rb->buffer, (uint8_t *)buf + (BUF_SIZE - (rb->cont_end + pos)), count - (BUF_SIZE - (rb->cont_end + pos)));
-		rb->end = rb->end >= count - (BUF_SIZE - (rb->cont_end + pos)) ? rb->end : count - (BUF_SIZE - (rb->cont_end + pos));
+		memcpy(rb->buffer + pos, buf, BUF_SIZE - (rb->cont_end + pos));
+		memcpy(rb->buffer, (uint8_t *)buf + (BUF_SIZE - pos), count - (BUF_SIZE - pos));
+		rb->end = rb->end >= count - (BUF_SIZE - pos) ? rb->end : count - (BUF_SIZE - pos);
 		rb->size = rb->end + BUF_SIZE - rb->start;
 	}
 	else
 	{
-		memcpy(rb->buffer + rb->cont_end + pos, buf, count);
-		rb->end = rb->end >= rb->cont_end + pos + count ? rb->end : rb->cont_end + pos + count;
+		memcpy(rb->buffer + pos, buf, count);
+		rb->end = rb->end >= pos + count ? rb->end : pos + count;
 		rb->size = rb->end - rb->start;
 	}
 	return count;
 }
 
-size_t TCPAssignment::wb_read(struct write_buffer *wb, void *buf, size_t count)
+size_t TCPAssignment::wb_read(struct write_buffer *wb, size_t pos, void *buf, size_t count)
 {
 	size_t read_count = wb->size >= count ? count : wb->size;
-	if(wb->start + read_count > BUF_SIZE)
+	if(pos + read_count > BUF_SIZE)
 	{
-		memcpy(buf, wb->buffer + wb->start, BUF_SIZE - wb->start);
-		memcpy((uint8_t *)buf + (BUF_SIZE - wb->start), wb->buffer, read_count - (BUF_SIZE - wb->start));
+		memcpy(buf, wb->buffer + pos, BUF_SIZE - wb->start);
+		memcpy((uint8_t *)buf + (BUF_SIZE - pos), wb->buffer, read_count - (BUF_SIZE - pos));
 	}
 	else
-		memcpy(buf, wb->buffer + wb->start, read_count);
+		memcpy(buf, wb->buffer + pos, read_count);
 	return read_count;
 }
 

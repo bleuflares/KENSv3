@@ -327,6 +327,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 								ri.start = connection->rb.cont_end + seq_num - connection->ack_num;
 								ri.end = ri.start + payload_len;
 								ri.size = payload_len;
+								ri.seq_num = seq_num;
 
 								connection->rmgr.read_infos.push_back(ri);
 								connection->rmgr.read_infos.sort(asc_seq);
@@ -487,6 +488,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 						ri.start = rcv_socket->rb.cont_end + seq_num - rcv_socket->ack_num;
 						ri.end = ri.start + payload_len;
 						ri.size = payload_len;
+						ri.seq_num = seq_num;
 
 						rcv_socket->rmgr.read_infos.push_back(ri);
 						rcv_socket->rmgr.read_infos.sort(asc_seq);
@@ -519,6 +521,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 							size_t read_count = rb_read(&rcv_socket->rb, rcv_socket->read_buf, rcv_socket->read_count);
 
 							rcv_socket->rb.start = (rcv_socket->rb.start + read_count) % (BUF_SIZE + 1);
+							rcv_socket->rb.cont_size -= read_count;
 							rcv_socket->rb.size -= read_count;
 
 							this->returnSystemCall(rcv_socket->uuid, read_count);
@@ -784,6 +787,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 						ri.start = rcv_socket->rb.cont_end + seq_num - rcv_socket->ack_num;
 						ri.end = ri.start + payload_len;
 						ri.size = payload_len;
+						ri.seq_num = seq_num;
 
 						rcv_socket->rmgr.read_infos.push_back(ri);
 						rcv_socket->rmgr.read_infos.sort(asc_seq);
@@ -840,6 +844,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 						ri.start = rcv_socket->rb.cont_end + seq_num - rcv_socket->ack_num;
 						ri.end = ri.start + payload_len;
 						ri.size = payload_len;
+						ri.seq_num = seq_num;
 
 						rcv_socket->rmgr.read_infos.push_back(ri);
 						rcv_socket->rmgr.read_infos.sort(asc_seq);
@@ -1191,6 +1196,7 @@ void TCPAssignment::syscall_read(UUID syscallUUID, int pid, int fd, void *buf, s
 	{
 		size_t read_count = rb_read(&socket->rb, buf, count);
 		socket->rb.start = (socket->rb.start + read_count) % (BUF_SIZE + 1);
+		socket->rb.cont_size -= read_count;
 		socket->rb.size -= read_count;
 
 		this->returnSystemCall(syscallUUID, read_count);
@@ -1251,7 +1257,7 @@ void TCPAssignment::syscall_write(UUID syscallUUID, int pid, int fd, const void 
 				uint8_t payload[MSS];
 				size_t read_count = wb_read(&socket->wb, wi.start, payload, wi.size);
 
-				send_packet(20 + 20 + read_count, ((struct sockaddr_in *)&socket->src_addr)->sin_addr.s_addr, ((struct sockaddr_in *)&socket->dst_addr)->sin_addr.s_addr, ((struct sockaddr_in *)&socket->src_addr)->sin_port, ((struct sockaddr_in *)&socket->dst_addr)->sin_port, socket->seq_num, socket->ack_num, ACK, BUF_SIZE - socket->rb.size, payload);
+				send_packet(20 + 20 + read_count, ((struct sockaddr_in *)&socket->src_addr)->sin_addr.s_addr, ((struct sockaddr_in *)&socket->dst_addr)->sin_addr.s_addr, ((struct sockaddr_in *)&socket->src_addr)->sin_port, ((struct sockaddr_in *)&socket->dst_addr)->sin_port, socket->seq_num, 0x00000000, ACK, BUF_SIZE - socket->rb.size, payload);
 
 				if(socket->wmgr.write_infos.empty())
 				{

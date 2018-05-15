@@ -194,7 +194,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 		this->freePacket(packet);
 		return;
 	}
-	
+
 	switch(rcv_socket->tcp_state)
 	{
 		case TCP_LISTEN:
@@ -864,7 +864,6 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 					struct timer_payload *timer = new struct timer_payload;
 					timer->type = PAYLOAD_SOCKET;
 					timer->socket = rcv_socket;
-
 					timer->uuid = addTimer(timer, TimeUtil::makeTime(60, TimeUtil::SEC));
 				}
 			}
@@ -899,6 +898,7 @@ void TCPAssignment::timerCallback(void *payload)
 			}
 		}
 		if(!found)
+			assert(0);
 			return;
 
 		socket->connections.clear();

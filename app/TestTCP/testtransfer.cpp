@@ -126,7 +126,6 @@ protected:
 			{
 				int remaining = buffer_size;
 				int read_byte = 0;
-				int loop_cnt = 0;
 				while((read_byte = read(client_fd, recv_buffer + (buffer_size - remaining), remaining)) >= 0)
 				{
 					total_size += read_byte;

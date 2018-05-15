@@ -282,6 +282,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 							s_socket.backlog = 0;
 							s_socket.seq_num = connection->seq_num;
 							s_socket.ack_num = connection->ack_num;
+							s_socket.close_called = false;
 							s_socket.accept_called = false;
 							s_socket.accept_addr = NULL;
 							s_socket.accept_addrlen = NULL;
@@ -320,7 +321,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 							{
 								uint8_t payload[MSS];
 								packet->readData(14 + 20 + 20, payload, payload_len);
-								rb_write(&connection->rb, connection->rb.cont_end + seq_num - connection->ack_num, payload, payload_len);
+								rb_write(&connection->rb, (connection->rb.cont_end + seq_num - connection->ack_num) % (BUF_SIZE + 1), payload, payload_len);
 
 								struct read_info ri;
 								ri.start = connection->rb.cont_end + seq_num - connection->ack_num;
@@ -357,14 +358,18 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 						rcv_socket->connections.erase(connection_iter);
 						if(rcv_socket->connections.empty())
 						{
-							UUID temp_uuid = rcv_socket->uuid;
-							int temp_pid = rcv_socket->pid;
-							std::array<int, 2> fd_to_pid = {{rcv_fd, temp_pid}};
-							rcv_socket->connections.clear();
-							fd_to_socket.erase(fd_to_pid);
-							this->removeFileDescriptor(temp_pid, rcv_fd);
+							if(rcv_socket->close_called)
+							{
+								UUID temp_uuid = rcv_socket->uuid;
+								int temp_pid = rcv_socket->pid;
+								rcv_socket->connections.clear();
+								rcv_socket->close_called = false;
+								std::array<int, 2> fd_to_pid = {{rcv_fd, temp_pid}};
+								fd_to_socket.erase(fd_to_pid);
+								this->removeFileDescriptor(temp_pid, rcv_fd);
 
-							this->returnSystemCall(temp_uuid, 0);
+								this->returnSystemCall(temp_uuid, 0);
+							}
 						}
 
 					}
@@ -476,7 +481,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 					{
 						uint8_t payload[MSS];
 						packet->readData(14 + 20 + 20, payload, payload_len);
-						rb_write(&rcv_socket->rb, rcv_socket->rb.cont_end + seq_num - rcv_socket->ack_num, payload, payload_len);
+						rb_write(&rcv_socket->rb, (rcv_socket->rb.cont_end + seq_num - rcv_socket->ack_num) % (BUF_SIZE + 1), payload, payload_len);
 
 						struct read_info ri;
 						ri.start = rcv_socket->rb.cont_end + seq_num - rcv_socket->ack_num;
@@ -549,7 +554,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 							timer->socket = rcv_socket;
 							rcv_socket->retransmit_timer = timer;
 
-							rcv_socket->retransmit_timer->uuid = addTimer(rcv_socket->retransmit_timer, TimeUtil::makeTime(100, TimeUtil::MSEC));
+							timer->uuid = addTimer(rcv_socket->retransmit_timer, TimeUtil::makeTime(100, TimeUtil::MSEC));
 						}
 					}
 					else
@@ -588,6 +593,29 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 								rcv_socket->write_count = 0;
 
 								this->returnSystemCall(rcv_socket->uuid, write_count);
+							}
+						}
+
+						if(!rcv_socket->wmgr.write_infos.empty())
+						{
+							struct timer_payload *timer = new struct timer_payload;
+							timer->type = PAYLOAD_PACKET;
+							timer->socket = rcv_socket;
+							rcv_socket->retransmit_timer = timer;
+
+							timer->uuid = addTimer(timer, TimeUtil::makeTime(100, TimeUtil::MSEC));
+						}
+						else
+						{
+							if(rcv_socket->close_called)
+							{
+								send_packet(20 + 20, ((struct sockaddr_in *)&rcv_socket->src_addr)->sin_addr.s_addr, ((struct sockaddr_in *)&rcv_socket->dst_addr)->sin_addr.s_addr, ((struct sockaddr_in *)&rcv_socket->src_addr)->sin_port, ((struct sockaddr_in *)&rcv_socket->dst_addr)->sin_port, rcv_socket->seq_num, 0x00000000, FIN, BUF_SIZE - rcv_socket->rb.size, NULL);
+
+								rcv_socket->seq_num += 1;
+								rcv_socket->tcp_state = TCP_FIN_WAIT_1;
+								rcv_socket->close_called = false;
+
+								this->returnSystemCall(rcv_socket->uuid, 0);
 							}
 						}
 
@@ -662,7 +690,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 							timer->socket = rcv_socket;
 							rcv_socket->retransmit_timer = timer;
 
-							rcv_socket->retransmit_timer->uuid = addTimer(rcv_socket->retransmit_timer, TimeUtil::makeTime(100, TimeUtil::MSEC));
+							timer->uuid = addTimer(rcv_socket->retransmit_timer, TimeUtil::makeTime(100, TimeUtil::MSEC));
 						}
 					}
 					else
@@ -750,7 +778,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 					{
 						uint8_t payload[MSS];
 						packet->readData(14 + 20 + 20, payload, payload_len);
-						rb_write(&rcv_socket->rb, rcv_socket->rb.cont_end + seq_num - rcv_socket->ack_num, payload, payload_len);
+						rb_write(&rcv_socket->rb, (rcv_socket->rb.cont_end + seq_num - rcv_socket->ack_num) % (BUF_SIZE + 1), payload, payload_len);
 
 						struct read_info ri;
 						ri.start = rcv_socket->rb.cont_end + seq_num - rcv_socket->ack_num;
@@ -806,7 +834,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 					{
 						uint8_t payload[MSS];
 						packet->readData(14 + 20 + 20, payload, payload_len);
-						rb_write(&rcv_socket->rb, rcv_socket->rb.cont_end + seq_num - rcv_socket->ack_num, payload, payload_len);
+						rb_write(&rcv_socket->rb, (rcv_socket->rb.cont_end + seq_num - rcv_socket->ack_num) % (BUF_SIZE + 1), payload, payload_len);
 
 						struct read_info ri;
 						ri.start = rcv_socket->rb.cont_end + seq_num - rcv_socket->ack_num;
@@ -864,6 +892,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 					struct timer_payload *timer = new struct timer_payload;
 					timer->type = PAYLOAD_SOCKET;
 					timer->socket = rcv_socket;
+
 					timer->uuid = addTimer(timer, TimeUtil::makeTime(60, TimeUtil::SEC));
 				}
 			}
@@ -899,7 +928,6 @@ void TCPAssignment::timerCallback(void *payload)
 		}
 		if(!found)
 			assert(0);
-			return;
 
 		socket->connections.clear();
 		std::array<int, 2> fd_to_pid = {{fd, socket->pid}};
@@ -930,27 +958,31 @@ void TCPAssignment::timerCallback(void *payload)
 
 		if(socket->connections.empty())
 		{
-			int fd;
-
-			bool found = false;
-			for(auto socket_iter = fd_to_socket.begin(); socket_iter != fd_to_socket.end(); ++socket_iter)
+			if(socket->close_called)
 			{
-				if(socket == &socket_iter->second)
+				int fd;
+
+				bool found = false;
+				for(auto socket_iter = fd_to_socket.begin(); socket_iter != fd_to_socket.end(); ++socket_iter)
 				{
-					fd = socket_iter->first[0];
-					found = true;
-					break;
+					if(socket == &socket_iter->second)
+					{
+						fd = socket_iter->first[0];
+						found = true;
+						break;
+					}
 				}
+				if(!found)
+					assert(0);
+
+				socket->connections.clear();
+				socket->close_called = false;
+				std::array<int, 2> fd_to_pid = {{fd, socket->pid}};
+				fd_to_socket.erase(fd_to_pid);
+				this->removeFileDescriptor(socket->pid, fd);
+
+				this->returnSystemCall(socket->uuid, 0);
 			}
-			if(!found)
-				assert(0);
-
-			socket->connections.clear();
-			std::array<int, 2> fd_to_pid = {{fd, socket->pid}};
-			fd_to_socket.erase(fd_to_pid);
-			this->removeFileDescriptor(socket->pid, fd);
-
-			this->returnSystemCall(socket->uuid, 0);
 		}
 	}
 	else if(timer->type == PAYLOAD_PACKET)
@@ -974,7 +1006,7 @@ void TCPAssignment::timerCallback(void *payload)
 		timer->socket = socket;
 		socket->retransmit_timer = retransmit_timer;
 
-		socket->retransmit_timer->uuid = addTimer(socket->retransmit_timer, TimeUtil::makeTime(100, TimeUtil::MSEC));
+		retransmit_timer->uuid = addTimer(socket->retransmit_timer, TimeUtil::makeTime(100, TimeUtil::MSEC));
 	}
 
 	delete(timer);
@@ -1008,6 +1040,7 @@ void TCPAssignment::syscall_socket(UUID syscallUUID, int pid, int domain, int ty
 	socket.backlog = 0;
 	socket.seq_num = initial_seq_num++;
 	socket.ack_num = 0x00000000;
+	socket.close_called = false;
 	socket.accept_called = false;
 	socket.accept_addr = NULL;
 	socket.accept_addrlen = NULL;
@@ -1081,6 +1114,8 @@ void TCPAssignment::syscall_close(UUID syscallUUID, int pid, int fd)
 						assert(0);
 				}
 
+				socket->close_called = true;
+
 				socket->uuid = syscallUUID;
 			}
 			break;
@@ -1094,12 +1129,21 @@ void TCPAssignment::syscall_close(UUID syscallUUID, int pid, int fd)
 			break;
 
 		case TCP_ESTABLISHED:
-			send_packet(20 + 20, ((struct sockaddr_in *)&socket->src_addr)->sin_addr.s_addr, ((struct sockaddr_in *)&socket->dst_addr)->sin_addr.s_addr, ((struct sockaddr_in *)&socket->src_addr)->sin_port, ((struct sockaddr_in *)&socket->dst_addr)->sin_port, socket->seq_num, 0x00000000, FIN, BUF_SIZE - socket->rb.size, NULL);
+			if(socket->wmgr.write_infos.empty())
+			{
+				send_packet(20 + 20, ((struct sockaddr_in *)&socket->src_addr)->sin_addr.s_addr, ((struct sockaddr_in *)&socket->dst_addr)->sin_addr.s_addr, ((struct sockaddr_in *)&socket->src_addr)->sin_port, ((struct sockaddr_in *)&socket->dst_addr)->sin_port, socket->seq_num, 0x00000000, FIN, BUF_SIZE - socket->rb.size, NULL);
 
-			socket->seq_num += 1;
-			socket->tcp_state = TCP_FIN_WAIT_1;
+				socket->seq_num += 1;
+				socket->tcp_state = TCP_FIN_WAIT_1;
 
-			this->returnSystemCall(syscallUUID, 0);
+				this->returnSystemCall(syscallUUID, 0);
+			}
+			else
+			{
+				socket->close_called = true;
+
+				socket->uuid = syscallUUID;
+			}
 			break;
 
 		case TCP_CLOSE_WAIT:
@@ -1402,6 +1446,7 @@ void TCPAssignment::syscall_accept(UUID syscallUUID, int pid, int sockfd,
 		s_socket.backlog = 0;
 		s_socket.seq_num = connection->seq_num;
 		s_socket.ack_num = connection->ack_num;
+		s_socket.close_called = false;
 		s_socket.accept_called = false;
 		s_socket.accept_addr = NULL;
 		s_socket.accept_addrlen = NULL;
@@ -1596,8 +1641,8 @@ size_t TCPAssignment::rb_read(struct read_buffer *rb, void *buf, size_t count)
 	size_t read_count = rb->cont_size >= count ? count : rb->cont_size;
 	if(rb->start + read_count > BUF_SIZE)
 	{
-		memcpy(buf, rb->buffer + rb->start, BUF_SIZE - rb->start);
-		memcpy((uint8_t *)buf + (BUF_SIZE - rb->start), rb->buffer, read_count - (BUF_SIZE - rb->start));
+		memcpy(buf, rb->buffer + rb->start, (BUF_SIZE + 1) - rb->start);
+		memcpy((uint8_t *)buf + ((BUF_SIZE + 1) - rb->start), rb->buffer, read_count - ((BUF_SIZE + 1) - rb->start));
 	}
 	else
 		memcpy(buf, rb->buffer + rb->start, read_count);
@@ -1608,10 +1653,10 @@ size_t TCPAssignment::rb_write(struct read_buffer *rb, size_t pos, void *buf, si
 {
 	if(pos + count > BUF_SIZE)
 	{
-		memcpy(rb->buffer + pos, buf, BUF_SIZE - pos);
-		memcpy(rb->buffer, (uint8_t *)buf + (BUF_SIZE - pos), count - (BUF_SIZE - pos));
-		rb->end = rb->end >= count - (BUF_SIZE - pos) ? rb->end : count - (BUF_SIZE - pos);
-		rb->size = rb->end + BUF_SIZE - rb->start;
+		memcpy(rb->buffer + pos, buf, (BUF_SIZE + 1) - pos);
+		memcpy(rb->buffer, (uint8_t *)buf + ((BUF_SIZE + 1) - pos), count - ((BUF_SIZE + 1) - pos));
+		rb->end = rb->end >= count - ((BUF_SIZE + 1) - pos) ? rb->end : count - ((BUF_SIZE + 1) - pos);
+		rb->size = rb->end + (BUF_SIZE + 1) - rb->start;
 	}
 	else
 	{
@@ -1627,8 +1672,8 @@ size_t TCPAssignment::wb_read(struct write_buffer *wb, size_t pos, void *buf, si
 	size_t read_count = wb->size >= count ? count : wb->size;
 	if(pos + read_count > BUF_SIZE)
 	{
-		memcpy(buf, wb->buffer + pos, BUF_SIZE - pos);
-		memcpy((uint8_t *)buf + (BUF_SIZE - pos), wb->buffer, read_count - (BUF_SIZE - pos));
+		memcpy(buf, wb->buffer + pos, (BUF_SIZE + 1) - pos);
+		memcpy((uint8_t *)buf + ((BUF_SIZE + 1) - pos), wb->buffer, read_count - ((BUF_SIZE + 1) - pos));
 	}
 	else
 		memcpy(buf, wb->buffer + pos, read_count);
@@ -1640,9 +1685,9 @@ size_t TCPAssignment::wb_write(struct write_buffer *wb, void *buf, size_t count)
 {
 	if(wb->end + count > BUF_SIZE)
 	{
-		memcpy(wb->buffer + wb->end, buf, BUF_SIZE - wb->end);
-		memcpy(wb->buffer, (uint8_t *)buf + (BUF_SIZE - wb->end), count - (BUF_SIZE - wb->end));
-		wb->end = count - (BUF_SIZE - wb->end);
+		memcpy(wb->buffer + wb->end, buf, (BUF_SIZE + 1) - wb->end);
+		memcpy(wb->buffer, (uint8_t *)buf + ((BUF_SIZE + 1) - wb->end), count - ((BUF_SIZE + 1) - wb->end));
+		wb->end = count - ((BUF_SIZE + 1) - wb->end);
 	}
 	else
 	{

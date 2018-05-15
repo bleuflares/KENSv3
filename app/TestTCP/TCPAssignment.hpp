@@ -117,6 +117,8 @@ namespace E
 		uint32_t ack_num;
 		std::list<struct connection> connections;
 
+		bool close_called;
+
 		bool accept_called;
 		sockaddr *accept_addr;
 		socklen_t *accept_addrlen;

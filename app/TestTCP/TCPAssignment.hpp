@@ -55,6 +55,7 @@ namespace E
 		size_t end;
 		size_t size;
 		uint32_t seq_num;
+		uint32_t ack_num;
 	};
 
 	struct read_manager

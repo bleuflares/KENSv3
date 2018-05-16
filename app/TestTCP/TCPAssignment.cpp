@@ -549,7 +549,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 								uint8_t payload[MSS];
 								size_t read_count = wb_read(&rcv_socket->wb, wi->start, payload, wi->size);
 
-								send_packet(20 + 20 + read_count, dst_ip, src_ip, dst_port, src_port, wi->seq_num, 0x00000000, ACK, BUF_SIZE - rcv_socket->rb.size, payload);
+								send_packet(20 + 20 + read_count, dst_ip, src_ip, dst_port, src_port, wi->seq_num, wi->ack_num, ACK, BUF_SIZE - rcv_socket->rb.size, payload);
 							}
 
 							struct timer_payload *timer = new struct timer_payload;
@@ -634,11 +634,12 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 								wi.end = (wi.start + seg_len) % (BUF_SIZE + 1);
 								wi.size = seg_len;
 								wi.seq_num = rcv_socket->seq_num;
+								wi.ack_num = rcv_socket->ack_num;
 
 								uint8_t payload[MSS];
 								size_t read_count = wb_read(&rcv_socket->wb, wi.start, payload, wi.size);
 
-								send_packet(20 + 20 + read_count, dst_ip, src_ip, dst_port, src_port, wi.seq_num, 0x00000000, ACK, BUF_SIZE - rcv_socket->rb.size, payload);
+								send_packet(20 + 20 + read_count, dst_ip, src_ip, dst_port, src_port, wi.seq_num, wi.ack_num, ACK, BUF_SIZE - rcv_socket->rb.size, payload);
 
 								if(rcv_socket->wmgr.write_infos.empty())
 								{
@@ -685,7 +686,7 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 								uint8_t payload[MSS];
 								size_t read_count = wb_read(&rcv_socket->wb, wi->start, payload, wi->size);
 
-								send_packet(20 + 20 + read_count, dst_ip, src_ip, dst_port, src_port, wi->seq_num, 0x00000000, ACK, BUF_SIZE - rcv_socket->rb.size, payload);
+								send_packet(20 + 20 + read_count, dst_ip, src_ip, dst_port, src_port, wi->seq_num, wi->ack_num, ACK, BUF_SIZE - rcv_socket->rb.size, payload);
 							}
 
 							struct timer_payload *timer = new struct timer_payload;
@@ -733,11 +734,12 @@ void TCPAssignment::packetArrived(std::string fromModule, Packet *packet)
 								wi.end = (wi.start + seg_len) % (BUF_SIZE + 1);
 								wi.size = seg_len;
 								wi.seq_num = rcv_socket->seq_num;
+								wi.ack_num = rcv_socket->ack_num;
 
 								uint8_t payload[MSS];
 								size_t read_count = wb_read(&rcv_socket->wb, wi.start, payload, wi.size);
 
-								send_packet(20 + 20 + read_count, dst_ip, src_ip, dst_port, src_port, wi.seq_num, 0x00000000, ACK, BUF_SIZE - rcv_socket->rb.size, payload);
+								send_packet(20 + 20 + read_count, dst_ip, src_ip, dst_port, src_port, wi.seq_num, wi.ack_num, ACK, BUF_SIZE - rcv_socket->rb.size, payload);
 
 								if(rcv_socket->wmgr.write_infos.empty())
 								{
@@ -1003,7 +1005,7 @@ void TCPAssignment::timerCallback(void *payload)
 			uint8_t payload[MSS];
 			size_t read_count = wb_read(&socket->wb, wi->start, payload, wi->size);
 
-			send_packet(20 + 20 + read_count, ((struct sockaddr_in *)&socket->src_addr)->sin_addr.s_addr, ((struct sockaddr_in *)&socket->dst_addr)->sin_addr.s_addr, ((struct sockaddr_in *)&socket->src_addr)->sin_port, ((struct sockaddr_in *)&socket->dst_addr)->sin_port, wi->seq_num, 0x00000000, ACK, BUF_SIZE - socket->rb.size, payload);
+			send_packet(20 + 20 + read_count, ((struct sockaddr_in *)&socket->src_addr)->sin_addr.s_addr, ((struct sockaddr_in *)&socket->dst_addr)->sin_addr.s_addr, ((struct sockaddr_in *)&socket->src_addr)->sin_port, ((struct sockaddr_in *)&socket->dst_addr)->sin_port, wi->seq_num, wi->ack_num, ACK, BUF_SIZE - socket->rb.size, payload);
 		}
 
 		struct timer_payload *retransmit_timer = new struct timer_payload;
@@ -1253,11 +1255,12 @@ void TCPAssignment::syscall_write(UUID syscallUUID, int pid, int fd, const void 
 				wi.end = (wi.start + seg_len) % (BUF_SIZE + 1);
 				wi.size = seg_len;
 				wi.seq_num = socket->seq_num;
+				wi.ack_num = socket->ack_num;
 
 				uint8_t payload[MSS];
 				size_t read_count = wb_read(&socket->wb, wi.start, payload, wi.size);
 
-				send_packet(20 + 20 + read_count, ((struct sockaddr_in *)&socket->src_addr)->sin_addr.s_addr, ((struct sockaddr_in *)&socket->dst_addr)->sin_addr.s_addr, ((struct sockaddr_in *)&socket->src_addr)->sin_port, ((struct sockaddr_in *)&socket->dst_addr)->sin_port, socket->seq_num, 0x00000000, ACK, BUF_SIZE - socket->rb.size, payload);
+				send_packet(20 + 20 + read_count, ((struct sockaddr_in *)&socket->src_addr)->sin_addr.s_addr, ((struct sockaddr_in *)&socket->dst_addr)->sin_addr.s_addr, ((struct sockaddr_in *)&socket->src_addr)->sin_port, ((struct sockaddr_in *)&socket->dst_addr)->sin_port, wi.seq_num, wi.ack_num, ACK, BUF_SIZE - socket->rb.size, payload);
 
 				if(socket->wmgr.write_infos.empty())
 				{
